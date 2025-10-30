@@ -1,5 +1,6 @@
 # No eliminar !!!!!!!!!!
 config.py
+fields.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
