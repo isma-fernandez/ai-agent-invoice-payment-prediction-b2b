@@ -12,9 +12,15 @@ class OdooConnection:
     async def connect(self):
         self.client = OdooClient(
             url=self.url,
-            db=self.db,
+            database=self.db,
             username=self.username,
             password=self.password
         )
         await self.client.connect()
         return self.client
+
+    async def search_read(self, model, domain, fields):
+        return await self.client.search_read(model, domain, fields)
+    
+    async def execute_kw(self, model, method, args, kwargs=None):
+        return await self.client.execute_kw(model, method, args, kwargs)

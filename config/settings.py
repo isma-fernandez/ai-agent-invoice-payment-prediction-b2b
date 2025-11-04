@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings): 
     # Configuración Odoo
@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     ODOO_DB: str
     ODOO_USERNAME: str
     ODOO_PASSWORD: str
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 settings = Settings()
 
