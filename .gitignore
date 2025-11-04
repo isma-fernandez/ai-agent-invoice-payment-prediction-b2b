@@ -1,7 +1,7 @@
 # No eliminar !!!!!!!!!!
-config.py
+config/settings.env
 fields.txt
-
+mcp_odoo/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
