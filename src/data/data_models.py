@@ -19,12 +19,26 @@ class Invoice(BaseModel):
     invoice_date: date | None = None  # Fecha de la factura 
     invoice_date_due: date | None  # Fecha de vencimiento
     journal_id: Tuple[int, str] | None  # Diario asociado [id, nombre]
-    payment_dates: List[date] | None | str  # Fechas de pago asociadas a la factura
+    payment_dates: date | None  # Fechas de pago asociadas a la factura
 
     # Campos adicionales fuera del modelo Odoo
-    paid_late: bool | None = False # Indica si se pagó tarde
+    paid_late: bool | None = None # Indica si se pagó tarde
     days_overdue: int | None = -1  # Días de retraso en el pago
 
+   
+    def model_post_init(self, context):
+        """
+        Calcula si la factura se pagó tarde y los días de retraso después de la inicialización del modelo.
+        """
+        if self.payment_dates and self.invoice_date_due:
+            self.paid_late = self.payment_dates > self.invoice_date_due
+            if self.paid_late and self.payment_dates and self.invoice_date_due:
+                self.days_overdue = (self.payment_dates - self.invoice_date_due).days
+            else:
+                self.days_overdue = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
 
 # res.partner
 class Partner(BaseModel):
@@ -47,19 +61,25 @@ class Partner(BaseModel):
     unpaid_invoices_count: int | None  # Número de facturas impagas
     unpaid_invoice_ids: List[int] | None  # IDs de facturas impagadas
 
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
 
 # res.partner.category
 class PartnerCategory(BaseModel):
     id: int
     name: str  # Nombre de la categoría
 
-
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
+    
 # res.company
 class Company(BaseModel):
     id: int
     name: str  # Nombre de la empresa
     currency_id: Tuple[int, str]  # Moneda de la empresa [id, nombre]
 
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
 
 # res.currency
 class Currency(BaseModel):
@@ -67,3 +87,6 @@ class Currency(BaseModel):
     name: str  # Nombre de la moneda
     symbol: str  # Símbolo
     rate: float  # Tasa de cambio
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
