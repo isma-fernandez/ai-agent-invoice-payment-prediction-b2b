@@ -29,7 +29,7 @@ class DataRetriever:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('company_id', '=', company_id),
                   ('move_type', '=', 'out_invoice')]
-        records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS)
+        records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
         return [Invoice.model_validate(record) for record in records]
     
     async def get_all_companies(self):
@@ -38,7 +38,7 @@ class DataRetriever:
         """
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
-        records = await self.odoo_connection.search_read('res.company', [], ['id', 'name', 'currency_id'])
+        records = await self.odoo_connection.search_read('res.company', [], ['id', 'name', 'currency_id'], 0)
         return [Company.model_validate(record) for record in records]
         
     async def get_all_partners(self):
@@ -47,7 +47,7 @@ class DataRetriever:
         """
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
-        records = await self.odoo_connection.search_read('res.partner', [], PARTNER_FIELDS)
+        records = await self.odoo_connection.search_read('res.partner', [], PARTNER_FIELDS, 0)
         return [Partner.model_validate(record) for record in records]
 
     async def get_all_currencies(self):
@@ -56,7 +56,7 @@ class DataRetriever:
         """
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
-        records = await self.odoo_connection.search_read('res.currency', [], ['id', 'name'])
+        records = await self.odoo_connection.search_read('res.currency', [], ['id', 'name'], 0)
         return [Currency.model_validate(record) for record in records]
     
     async def get_all_partner_categories(self):
@@ -65,7 +65,7 @@ class DataRetriever:
         """
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
-        records = await self.odoo_connection.search_read('res.partner.category', [], ['id', 'name'])
+        records = await self.odoo_connection.search_read('res.partner.category', [], ['id', 'name'], 0)
         return [PartnerCategory.model_validate(record) for record in records]
     
 
@@ -137,7 +137,7 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('partner_id', '=', partner_id)]
-        records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS)
+        records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
         return [Invoice.model_validate(record) for record in records]
     
     async def get_partners_by_company(self, company_id: int):
@@ -147,7 +147,7 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('company_id', '=', company_id)]
-        records = await self.odoo_connection.search_read('res.partner', domain, PARTNER_FIELDS)
+        records = await self.odoo_connection.search_read('res.partner', domain, PARTNER_FIELDS, 0)
         return [Partner.model_validate(record) for record in records]
     
     async def get_partners_by_category(self, category_id: int):
@@ -157,7 +157,7 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('category_id', 'in', [category_id])]
-        records = await self.odoo_connection.search_read('res.partner', domain, PARTNER_FIELDS)
+        records = await self.odoo_connection.search_read('res.partner', domain, PARTNER_FIELDS, 0)
         return [Partner.model_validate(record) for record in records]
     
     async def get_invoices_by_date(self, start_date: str, end_date: str, company_id: int):
@@ -168,5 +168,5 @@ class DataRetriever:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('invoice_date', '>=', start_date), ('invoice_date', '<=', end_date),
                   ('company_id', '=', company_id)]
-        records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS)
+        records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
         return [Invoice.model_validate(record) for record in records]

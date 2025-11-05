@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr, model_validator
+from pydantic import BaseModel, EmailStr, field_validator
 from datetime import date
 from typing import List, Tuple, Any
+from datetime import datetime
 
 # TODO: None temporales para evitar errores
 # TODO: Añadir gestión de excepciones en validaciones, en vez de excepción, asignar valor por defecto
@@ -19,23 +20,87 @@ class Invoice(BaseModel):
     invoice_date: date | None = None  # Fecha de la factura 
     invoice_date_due: date | None  # Fecha de vencimiento
     journal_id: Tuple[int, str] | None  # Diario asociado [id, nombre]
-    payment_dates: date | None  # Fechas de pago asociadas a la factura
+    payment_dates: date | None |str # Fechas de pago asociadas a la factura
 
     # Campos adicionales fuera del modelo Odoo
     paid_late: bool | None = None # Indica si se pagó tarde
     days_overdue: int | None = -1  # Días de retraso en el pago
 
-   
+    @field_validator("payment_dates", mode="before")
+    def empty_str_to_none(cls, v):
+        """
+        Convierte cadenas vacías o valores falsos en None.
+        Además convierte fechas con formato DD/MM/YYYY a date.
+        TODO: ya me dirás tú por qué tienen dos formatos de fecha distintos en Odoo (magic)
+        """
+        if not v or v is False or v == "":
+            return None
+        elif isinstance(v, date):
+            return v
+        elif isinstance(v, str):
+            try:
+                if "/" in v:
+                    return datetime.strptime(v, "%d/%m/%Y").date()
+            except ValueError:
+                return None
+        return v
+    
+    @field_validator("invoice_date", mode="before")
+    def parse_invoice_date(cls, v):
+        """
+        Convierte cadenas vacías o valores falsos en None.
+        Además convierte fechas con formato DD/MM/YYYY a date.
+        """
+        if not v or v is False or v == "":
+            return None
+        elif isinstance(v, date):
+            return v
+        elif isinstance(v, str):
+            try:
+                if "/" in v:
+                    return datetime.strptime(v, "%d/%m/%Y").date()
+            except ValueError:
+                return None
+        return v
+    
+    @field_validator("invoice_date_due", mode="before")
+    def parse_invoice_date_due(cls, v):
+        """
+        Convierte cadenas vacías o valores falsos en None.
+        Además convierte fechas con formato DD/MM/YYYY a date.
+        """
+        if not v or v is False or v == "":
+            return None
+        elif isinstance(v, date):
+            return v
+        elif isinstance(v, str):
+            try:
+                if "/" in v:
+                    return datetime.strptime(v, "%d/%m/%Y").date()
+            except ValueError:
+                return None
+        return v
+    
+    @field_validator("partner_id", mode="before")
+    def validate_partner_id(cls, v):
+        """
+        Asegura que partner_id es una tupla (id, nombre).
+        Si no se asigna un partner_id, Odoo devuelve False (qué sentido tiene eso?).
+        """
+        if not v or v is False:
+            return None
+        elif isinstance(v, tuple) and len(v) == 2:
+            return v
+        elif isinstance(v, list) and len(v) == 2:
+            return (v[0], v[1])
+        return None
+
     def model_post_init(self, context):
-        """
-        Calcula si la factura se pagó tarde y los días de retraso después de la inicialización del modelo.
-        """
-        if self.payment_dates and self.invoice_date_due:
-            self.paid_late = self.payment_dates > self.invoice_date_due
-            if self.paid_late and self.payment_dates and self.invoice_date_due:
-                self.days_overdue = (self.payment_dates - self.invoice_date_due).days
-            else:
-                self.days_overdue = 0
+        if self.payment_state == 'paid' and self.payment_dates and self.invoice_date_due:
+            days_late = (self.payment_dates - self.invoice_date_due).days
+            self.days_overdue = max(0, days_late)
+            self.paid_late = days_late > 0
+
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump()
