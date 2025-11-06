@@ -1,8 +1,8 @@
+from .data_models import Company, Currency, Partner, Invoice, PartnerCategory
 from .odoo_connector import OdooConnection
 from .config import INVOICE_FIELDS, PARTNER_FIELDS, BATCH_SIZE
 
 #TODO: clase demasiado grande, dividir en varios ficheros?
-#TODO: modificada para devolver diccionarios en lugar de modelos Pydantic, simplifica el preprocesado
 
 class DataRetriever:
     def __init__(self, odoo_connection: OdooConnection):
@@ -21,7 +21,7 @@ class DataRetriever:
             records = await self.odoo_connection.search_read('account.move', [('move_type', '=', 'out_invoice')], INVOICE_FIELDS, BATCH_SIZE, offset)
             if not records:
                 break
-            all_records.extend(records)
+            all_records.extend([Invoice.model_validate(record) for record in records])
             print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
             offset += BATCH_SIZE
         return all_records
@@ -40,7 +40,7 @@ class DataRetriever:
             records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, BATCH_SIZE, offset)
             if not records:
                 break
-            all_records.extend(records)
+            all_records.extend([Invoice.model_validate(record) for record in records])
             print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
             offset += BATCH_SIZE
         return all_records
@@ -53,7 +53,7 @@ class DataRetriever:
             raise Exception("El cliente no está conectado a Odoo.")
         records = await self.odoo_connection.search_read('res.company', [], ['id', 'name', 'currency_id'], 0)
 
-        return records
+        return [Company.model_validate(record) for record in records]
         
     async def get_all_partners(self):
         """
@@ -71,7 +71,7 @@ class DataRetriever:
             all_records.extend(records)
             print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
             offset += BATCH_SIZE
-        return all_records
+        return [Partner.model_validate(record) for record in all_records]
 
     async def get_all_currencies(self):
         """
@@ -80,7 +80,7 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         records = await self.odoo_connection.search_read('res.currency', [], ['id', 'name'], 0)
-        return records
+        return [Currency.model_validate(record) for record in records]
     
     async def get_all_partner_categories(self):
         """
@@ -89,7 +89,7 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         records = await self.odoo_connection.search_read('res.partner.category', [], ['id', 'name'], 0)
-        return records
+        return [PartnerCategory.model_validate(record) for record in records]
     
 
     """ MÉTODOS PARA RECUPERAR REGISTROS ESPECÍFICOS POR ID """
@@ -103,7 +103,7 @@ class DataRetriever:
         domain = [('id', '=', invoice_id)]
         invoice = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS)
         if invoice:
-            return invoice[0]
+            return Invoice.model_validate(invoice[0])
         return None
 
     async def get_partner_by_id(self, partner_id: int):
@@ -115,7 +115,7 @@ class DataRetriever:
         domain = [('id', '=', partner_id)]
         partner = await self.odoo_connection.search_read('res.partner', domain, PARTNER_FIELDS)
         if partner:
-            return partner[0]
+            return Partner.model_validate(partner[0])
         return None
     
     async def get_company_by_id(self, company_id: int):
@@ -136,7 +136,7 @@ class DataRetriever:
         domain = [('id', '=', currency_id)]
         currency = await self.odoo_connection.search_read('res.currency', domain, ['id', 'name'])
         if currency:
-            return currency[0]
+            return Currency.model_validate(currency[0])
         return None
     
     async def get_partner_category_by_id(self, category_id: int):
@@ -148,7 +148,7 @@ class DataRetriever:
         domain = [('id', '=', category_id)]
         category = await self.odoo_connection.search_read('res.partner.category', domain, ['id', 'name'])
         if category:
-            return category[0]
+            return PartnerCategory.model_validate(category[0])
         return None
     
     """ MÉTODOS ADICIONALES SEGÚN NECESIDAD """
@@ -161,7 +161,7 @@ class DataRetriever:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('partner_id', '=', partner_id)]
         records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
-        return records
+        return [Invoice.model_validate(record) for record in records]
     
     async def get_partners_by_company(self, company_id: int):
         """
@@ -171,7 +171,7 @@ class DataRetriever:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('company_id', '=', company_id)]
         records = await self.odoo_connection.search_read('res.partner', domain, PARTNER_FIELDS, 0)
-        return records
+        return [Partner.model_validate(record) for record in records]
     
     async def get_partners_by_category(self, category_id: int):
         """
@@ -181,7 +181,7 @@ class DataRetriever:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('category_id', 'in', [category_id])]
         records = await self.odoo_connection.search_read('res.partner', domain, PARTNER_FIELDS, 0)
-        return records
+        return [Partner.model_validate(record) for record in records]
     
     async def get_invoices_by_date(self, start_date: str, end_date: str, company_id: int):
         """
@@ -192,4 +192,4 @@ class DataRetriever:
         domain = [('invoice_date', '>=', start_date), ('invoice_date', '<=', end_date),
                   ('company_id', '=', company_id)]
         records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
-        return records
+        return [Invoice.model_validate(record) for record in records]

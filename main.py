@@ -1,4 +1,4 @@
-from src.data.data_retriever import DataRetriever
+from src.data.data_retriever_old import DataRetriever
 from src.data.odoo_connector import OdooConnection
 import asyncio
 

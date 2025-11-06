@@ -1,7 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from datetime import date
+from datetime import date, datetime
 from typing import List, Tuple, Any
-from datetime import datetime
 
 # TODO: None temporales para evitar errores
 # TODO: Añadir gestión de excepciones en validaciones, en vez de excepción, asignar valor por defecto
@@ -20,10 +19,10 @@ class Invoice(BaseModel):
     invoice_date: date | None = None  # Fecha de la factura 
     invoice_date_due: date | None  # Fecha de vencimiento
     journal_id: Tuple[int, str] | None  # Diario asociado [id, nombre]
-    payment_dates: date | None |str # Fechas de pago asociadas a la factura
+    payment_dates: date | None | str  # Fechas de pago asociadas a la factura
 
     # Campos adicionales fuera del modelo Odoo
-    paid_late: bool | None = None # Indica si se pagó tarde
+    paid_late: bool | None = None  # Indica si se pagó tarde
     days_overdue: int | None = -1  # Días de retraso en el pago
 
     @field_validator("payment_dates", mode="before")
@@ -102,7 +101,6 @@ class Invoice(BaseModel):
             self.days_overdue = max(0, days_late)
             self.paid_late = days_late > 0
 
-
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump()
 
@@ -121,7 +119,7 @@ class Partner(BaseModel):
     supplier_rank: int | None  # Rango de proveedor (>0 si es proveedor)
     category_id: List[Tuple[int, str]] | None  # Categorías asociadas
     credit: float | None  # Dinero que debe
-    credit_limit: float | None   # Límite de crédito
+    credit_limit: float | None  # Límite de crédito
     invoice_ids: List[int] | None  # IDs de facturas asociadas
     total_invoiced: float | None  # Monto total facturado
     unpaid_invoices_count: int | None  # Número de facturas impagas
@@ -134,6 +132,14 @@ class Partner(BaseModel):
 class PartnerCategory(BaseModel):
     id: int
     name: str  # Nombre de la categoría
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
+
+# res.partner.industry
+class PartnerIndustry(BaseModel):
+    id: int
+    name: str  # Nombre de la industria / sector
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump()
@@ -151,8 +157,15 @@ class Company(BaseModel):
 class Currency(BaseModel):
     id: int
     name: str  # Nombre de la moneda
-    symbol: str  # Símbolo
-    rate: float  # Tasa de cambio
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
+
+# res.country
+class Country(BaseModel):
+    id: int
+    name: str  # Nombre del país
+    code: str  # Código ISO del país
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump()
