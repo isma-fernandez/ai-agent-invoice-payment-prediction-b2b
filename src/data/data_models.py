@@ -89,10 +89,11 @@ class Invoice(BaseModel):
         """
         if not v or v is False:
             return None
-        elif isinstance(v, tuple) and len(v) == 2:
-            return v
         elif isinstance(v, list) and len(v) == 2:
             return (v[0], v[1])
+        # No suele pasar, pero por si acaso
+        elif isinstance(v, tuple) and len(v) == 2:
+            return v
         return None
 
     def model_post_init(self, context):

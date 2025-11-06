@@ -1,6 +1,7 @@
 from .data_models import Company, Currency, Partner, Invoice, PartnerCategory
 from .odoo_connector import OdooConnection
 
+BATCH_SIZE = 500
 INVOICE_FIELDS = ['id', 'name', 'move_type', 'payment_state', 'company_id',
             'partner_id', 'currency_id', 'amount_total', 'amount_residual',
             'invoice_date', 'invoice_date_due', 'journal_id', 'payment_dates']
@@ -29,8 +30,16 @@ class DataRetriever:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('company_id', '=', company_id),
                   ('move_type', '=', 'out_invoice')]
-        records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
-        return [Invoice.model_validate(record) for record in records]
+        all_records = []
+        offset = 0
+        while True:
+            records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, BATCH_SIZE, offset)
+            if not records:
+                break
+            all_records.extend([Invoice.model_validate(record) for record in records])
+            print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
+            offset += BATCH_SIZE
+        return all_records
     
     async def get_all_companies(self):
         """
@@ -39,6 +48,7 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         records = await self.odoo_connection.search_read('res.company', [], ['id', 'name', 'currency_id'], 0)
+
         return [Company.model_validate(record) for record in records]
         
     async def get_all_partners(self):
@@ -48,7 +58,15 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         records = await self.odoo_connection.search_read('res.partner', [], PARTNER_FIELDS, 0)
-        return [Partner.model_validate(record) for record in records]
+        all_records = []
+        offset = 0
+        while True:
+            records = await self.odoo_connection.search_read('res.partner', [], PARTNER_FIELDS, BATCH_SIZE, offset)
+            if not records:
+                break
+            all_records.extend(records)
+            offset += BATCH_SIZE
+        return [Partner.model_validate(record) for record in all_records]
 
     async def get_all_currencies(self):
         """

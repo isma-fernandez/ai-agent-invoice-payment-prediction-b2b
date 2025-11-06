@@ -19,8 +19,8 @@ class OdooConnection:
         await self.client.connect()
         return self.client
 
-    async def search_read(self, model, domain, fields):
-        return await self.client.search_read(model, domain, fields)
+    async def search_read(self, model, domain, fields, limit=0, offset=0):
+        return await self.client.search_read(model, domain, fields, limit, offset)
     
     async def execute_kw(self, model, method, args, kwargs=None):
         return await self.client.execute_kw(model, method, args, kwargs)
