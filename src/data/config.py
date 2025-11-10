@@ -3,18 +3,23 @@ Campos a extraer de los modelos de Odoo.
 """
 COMPANY_FIELDS = ['id', 'name', 'currency_id']
 
-PARTNER_FIELDS = ['id', 'name', 'email', 'phone', 'street', 'city',
-                  'zip', 'country_id', 'vat', 'customer_rank',
-                  'supplier_rank', 'category_id', 'credit',
-                  'credit_limit', 'invoice_ids',
-                  'total_invoiced', 'unpaid_invoices_count',
-                  'unpaid_invoice_ids']
+PARTNER_FIELDS = [
+    'id', 'name', 'email', 'phone', 'street', 'city', 'zip',
+    'country_id', 'customer_rank', 'supplier_rank', 'category_id',
+    'is_company', 'company_type', 'company_id', 'credit',
+    'credit_limit', 'debit', 'debit_limit', 'industry_id',
+    'invoice_ids', 'total_due', 'total_invoiced', 'total_overdue',
+    'trust', 'unpaid_invoice_ids', 'unpaid_invoices_count'
+]
 
-INVOICE_FIELDS = ['id', 'name', 'move_type', 'payment_state', 'company_id',
-                  'partner_id', 'currency_id', 'amount_total', 'amount_residual',
-                  'invoice_date', 'invoice_date_due', 'journal_id', 'payment_dates']
+INVOICE_FIELDS = [
+    'id', 'name', 'move_type', 'payment_state', 'company_id',
+    'partner_id', 'currency_id', 'amount_total', 'amount_paid',
+    'amount_residual', 'invoice_date', 'invoice_date_due',
+    'payment_dates', 'date', 'create_date', 'payment_id', 'payment_ids'
+]
 
-CURRENCY_FIELDS = ['id', 'name']
+CURRENCY_FIELDS = ['id', 'name', 'symbol', 'rate']
 
 COUNTRY_FIELDS = ['id', 'name', 'code']
 

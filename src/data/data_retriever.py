@@ -22,7 +22,8 @@ class DataRetriever:
             if not records:
                 break
             all_records.extend(records)
-            print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
+            if (offset // BATCH_SIZE) % 5 == 0:
+                print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
             offset += BATCH_SIZE
         return all_records
 
@@ -41,7 +42,8 @@ class DataRetriever:
             if not records:
                 break
             all_records.extend(records)
-            print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
+            if (offset // BATCH_SIZE) % 5 == 0:
+                print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
             offset += BATCH_SIZE
         return all_records
     
@@ -55,7 +57,7 @@ class DataRetriever:
 
         return records
         
-    async def get_all_partners(self):
+    async def get_all_customer_partners(self):
         """
         Recupera todos los partners (clientes/proveedores).
         """
@@ -64,12 +66,12 @@ class DataRetriever:
         all_records = []
         offset = 0
         while True:
-            print(f"Hasta aquí llego")
-            records = await self.odoo_connection.search_read('res.partner', [], PARTNER_FIELDS, BATCH_SIZE, offset)
+            records = await self.odoo_connection.search_read('res.partner', [('customer_rank', '>', '0')], PARTNER_FIELDS, BATCH_SIZE, offset)
             if not records:
                 break
             all_records.extend(records)
-            print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
+            if (offset // BATCH_SIZE) % 5 == 0:
+                print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
             offset += BATCH_SIZE
         return all_records
 
