@@ -92,6 +92,15 @@ class DataRetriever:
             raise Exception("El cliente no está conectado a Odoo.")
         records = await self.odoo_connection.search_read('res.partner.category', [], ['id', 'name'], 0)
         return records
+
+    async def get_all_industries(self):
+        """
+        Recupera todas las industrias.
+        """
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+        records = await self.odoo_connection.search_read('res.partner.industry', [], ['id', 'name'], 0)
+        return records
     
 
     """ MÉTODOS PARA RECUPERAR REGISTROS ESPECÍFICOS POR ID """
@@ -107,6 +116,17 @@ class DataRetriever:
         if invoice:
             return invoice[0]
         return None
+
+    async def get_invoice_line_by_invoice_id(self, invoice_id: int):
+        """
+        Recupera las líneas de una factura por su ID.
+        """
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+        domain = [('move_id', '=', invoice_id)]
+        invoice_lines = await self.odoo_connection.search_read('account.move.line', domain, ['id', 'move_id', 'product_id', 'quantity', 'price_unit', 'tax_ids'])
+        return invoice_lines
+
 
     async def get_partner_by_id(self, partner_id: int):
         """
