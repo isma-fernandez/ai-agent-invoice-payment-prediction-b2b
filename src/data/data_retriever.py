@@ -27,6 +27,30 @@ class DataRetriever:
             offset += BATCH_SIZE
         return all_records
 
+    async def get_all_lines_of_all_outbound_invoices(self):
+        """
+        Recupera todas las líneas de todas las facturas de salida (outbound).
+        """
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+        all_records = []
+        offset = 0
+        while True:
+            records = await self.odoo_connection.search_read('account.move.line', [('move_id.move_type', '=', 'out_invoice')], 
+                                                             ['id', 'move_id', 'product_id', 'quantity', 
+             'price_unit', 'tax_ids', 'reconciled', 'blocked', 
+             'date_maturity', 'debit', 'credit', 'balance',
+             'amount_residual', 'currency_id', 'company_id',
+             'discount', 'discount_percentage', 'full_reconcile_id',
+             'is_downpayment', 'reconcile_model_id'], BATCH_SIZE, offset)
+            if not records:
+                break
+            all_records.extend(records)
+            if (offset // BATCH_SIZE) % 5 == 0:
+                print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
+            offset += BATCH_SIZE
+        return all_records
+
     async def get_all_outbound_invoices_by_company(self, company_id: int):
         """
         Recupera todas las facturas de salida para una empresa dada.
@@ -124,7 +148,14 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('move_id', '=', invoice_id)]
-        invoice_lines = await self.odoo_connection.search_read('account.move.line', domain, ['id', 'move_id', 'product_id', 'quantity', 'price_unit', 'tax_ids'])
+        invoice_lines = await self.odoo_connection.search_read(
+            'account.move.line', domain, 
+            ['id', 'move_id', 'product_id', 'quantity', 
+             'price_unit', 'tax_ids', 'reconciled', 'blocked', 
+             'date_maturity', 'debit', 'credit', 'balance',
+             'amount_residual', 'currency_id', 'company_id',
+             'discount', 'discount_percentage', 'full_reconcile_id',
+             'is_downpayment', 'reconcile_model_id'])
         return invoice_lines
 
 
