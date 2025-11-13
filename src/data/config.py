@@ -7,9 +7,10 @@ PARTNER_FIELDS = [
     'id', 'name', 'email', 'phone', 'street', 'city', 'zip',
     'country_id', 'customer_rank', 'supplier_rank', 'category_id',
     'is_company', 'company_type', 'company_id', 'credit',
-    'credit_limit', 'debit', 'debit_limit', 'industry_id',
+    'credit_limit',  'industry_id', 'vat',
     'invoice_ids', 'total_due', 'total_invoiced', 'total_overdue',
-    'trust', 'unpaid_invoice_ids', 'unpaid_invoices_count'
+    'trust', 'unpaid_invoice_ids', 'unpaid_invoices_count', 'company_type', 
+    
 ]
 
 INVOICE_FIELDS = [

@@ -27,6 +27,24 @@ class DataRetriever:
             offset += BATCH_SIZE
         return all_records
 
+    async def get_all_invoices(self):
+        """
+        Recupera todas las facturas (inbound y outbound) de todas las empresas.
+        """
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+        all_records = []
+        offset = 0
+        while True:
+            records = await self.odoo_connection.search_read('account.move', [], INVOICE_FIELDS, BATCH_SIZE, offset)
+            if not records:
+                break
+            all_records.extend(records)
+            if (offset // BATCH_SIZE) % 5 == 0:
+                print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
+            offset += BATCH_SIZE
+        return all_records
+
     async def get_all_lines_of_all_outbound_invoices(self):
         """
         Recupera todas las líneas de todas las facturas de salida (outbound).
