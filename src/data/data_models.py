@@ -2,8 +2,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from datetime import date, datetime
 from typing import List, Tuple, Any
 
-# TODO: None temporales para evitar errores
-# TODO: Añadir gestión de excepciones en validaciones, en vez de excepción, asignar valor por defecto
+# TODO: Esto se debe cambiar para seguir con el modelo de datos del predictor
 
 # account.move
 class Invoice(BaseModel):

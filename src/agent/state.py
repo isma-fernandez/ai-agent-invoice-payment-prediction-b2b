@@ -3,7 +3,7 @@ from typing import Annotated, List, TypedDict
 from langchain_core.messages import BaseMessage
 
 class AgentState(TypedDict):
-    # Historial del chat
+    # Historial del chat (inputs cliente, pensamientos y outputs (herramientas, msgs) del agente)
     # metadatos operator.add para indicar a langgraph no sobrescribir esta variable
     messages: Annotated[List[BaseMessage], operator.add]
     
