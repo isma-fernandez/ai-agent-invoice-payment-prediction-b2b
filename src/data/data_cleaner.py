@@ -9,23 +9,25 @@ class DataCleaner:
     """
     def __init__(self):
         # Clientes a excluir
-        self.clients_to_exclude = ["Marketplace"]
+        self.clients_to_exclude = "Marketplace"
 
         # Configuración para limpieza de estados de pago
         self.partial_to_paid_threshold = 0.5
 
         self._currency_rates = {}
 
+
     def clean_raw_data(self, invoices_df: pd.DataFrame, partners_df: pd.DataFrame = None) -> pd.DataFrame:
         """
         Limpia los datos recibidos de la base de datos
         """
-        self._currency_rates = self._get_currency_rates(invoices_df['currency_name'].unique().tolist())
+        
 
         invoices_cleaned = self._clean_invoices(invoices_df=invoices_df)
         partners_cleaned = self._clean_partners(partners_df=partners_df, invoices_df=invoices_cleaned)
 
         return invoices_cleaned, partners_cleaned
+
 
     def _clean_invoices(self, invoices_df: pd.DataFrame):
         """
@@ -38,6 +40,7 @@ class DataCleaner:
 
         # Convertir campos *_id en dos columnas separadas
         df = self._split_id_name_fields(df)
+        self._currency_rates = self._get_currency_rates(df['currency_name'].unique().tolist())
 
         # Procesar estados de pago
         df = self._clean_payment_state(df)
@@ -60,9 +63,10 @@ class DataCleaner:
         df = df.dropna(subset=['invoice_date', 'invoice_date_due', 'payment_dates'])
 
         # Eliminar facturas de marketplace (no aportan información relevante)
-        df = df[~df['partner_name'].isin(self.clients_to_exclude)]
+        df = df[~df['partner_name'].str.contains(self.clients_to_exclude)]
 
         return df.reset_index(drop=True)
+
 
     def _clean_partners(self, partners_df: pd.DataFrame, invoices_df: pd.DataFrame = None):
         """
@@ -87,6 +91,7 @@ class DataCleaner:
 
         return df.reset_index(drop=True)
 
+
     def _fill_invoice_info(self, partners_df: pd.DataFrame, invoices_df: pd.DataFrame) -> pd.DataFrame:
         """
         Rellena las columnas invoice_count, invoice_ids y total_invoiced_eur en el dataframe de partners.
@@ -106,6 +111,7 @@ class DataCleaner:
         
         return df
 
+
     def _odoo_missing_values_to_null(self, df):
         """
         Convierte los valores que Odoo usa para representar datos faltantes a NaN.
@@ -115,6 +121,7 @@ class DataCleaner:
         df[object_cols] = (df[object_cols].replace({False: pd.NA, '' : pd.NA, '/' : pd.NA}))
         df[object_cols] = df[object_cols].applymap(lambda x: np.nan if x == [] else x)
         return df
+
 
     def _convert_to_datetime(self, df, columns):
         """
@@ -131,6 +138,7 @@ class DataCleaner:
                 print(f"Error al convertir '{col}': {e}")
         return df
 
+
     def _split_id_name_fields(self, df):
         """
         Encuentra campos que son tuplas (id, nombre) y los separa en dos columnas.
@@ -141,6 +149,7 @@ class DataCleaner:
             df[field[:-3] + '_name'] = df[field].apply(lambda x: x[1] if isinstance(x, list) and len(x) == 2 else np.nan)
             df = df.drop(columns=[field])
         return df
+
 
     def _clean_payment_state(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -163,6 +172,7 @@ class DataCleaner:
         
         return df
 
+
     def _fix_partial_to_paid_invoices(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Ajusta el estado de pago de facturas parciales a pagadas si el residual es menor que un umbral.
@@ -171,6 +181,7 @@ class DataCleaner:
         df.loc[(df['payment_state'] == 'partial') & (df['amount_residual'] 
             < self.partial_to_paid_threshold), 'payment_state'] = 'paid'
         return df
+
 
     def _convert_amounts_to_eur(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -183,8 +194,14 @@ class DataCleaner:
             lambda row: row['amount_total'] * self._currency_rates.get(row['currency_name'], 1) 
             if row['currency_name'] != 'EUR' else row['amount_total'], axis=1
         )
+
+        df['amount_residual_eur'] = df.apply(
+            lambda row: row['amount_residual'] * self._currency_rates.get(row['currency_name'], 1) 
+            if row['currency_name'] != 'EUR' else row['amount_residual'], axis=1
+        )
         
         return df
+
 
     def _get_currency_rates(self, currencies_df: list) -> dict:
         """
@@ -203,6 +220,7 @@ class DataCleaner:
                     print(f"Error retrieving rate for {currency}: {e}")
                     raise e
         return rates
+
 
     def _clean_payment_dates(self, df: pd.DataFrame) -> pd.DataFrame:
         """

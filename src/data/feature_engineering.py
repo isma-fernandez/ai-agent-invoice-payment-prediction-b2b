@@ -15,6 +15,7 @@ class FeatureEngineering:
         # % de facturas a eliminar según días de retraso
         self.outlier_percentile = 0.995
 
+
     def process_invoice_data_for_model(self, invoices_df: pd.DataFrame) -> pd.DataFrame:
         """
         Transforma los datos limpios en las características que necesita el modelo.
@@ -48,6 +49,7 @@ class FeatureEngineering:
 
         return df.reset_index(drop=True)
 
+
     def generate_complete_dataset(self, paid_invoices_df: pd.DataFrame, unpaid_invoices_df: pd.DataFrame, 
                                   partners_df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -62,6 +64,7 @@ class FeatureEngineering:
         dataset = self._calculate_historical_features(dataset, unpaid_invoices_df)
 
         return dataset.reset_index(drop=True)
+
 
     def _init_historical_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -84,6 +87,7 @@ class FeatureEngineering:
 
         return df
     
+
     def _calculate_historical_features(self, dataset: pd.DataFrame, unpaid_invoices_df: pd.DataFrame) -> pd.DataFrame:
         """
         Calcula las características históricas para cada factura en el dataset.
@@ -104,14 +108,17 @@ class FeatureEngineering:
             self._update_prior_invoices_features(df, id, prior_invoices_partner)
 
             # Características de fechas de vencimiento
-            self._update_date_features(dataset, df, id, row)
+            self._update_date_features(df, id, row)
 
             # Características de facturas pendientes
             outstanding_invoices_partner = (unpaid_invoices_df[(unpaid_invoices_df['partner_id'] == partner_id) 
                                                                 & (unpaid_invoices_df['invoice_date'] < row['invoice_date'])])
             self._update_outstanding_features(df, id, outstanding_invoices_partner)
+
+            df['paid_late'] = df['payment_overdue_days'] > 0
             
         return df
+
 
     def _update_prior_invoices_features(self, df, id, prior_invoices_partner):
         """
@@ -138,9 +145,10 @@ class FeatureEngineering:
 
             # Característica promedio de retraso
             df.loc[df["id"] == id, 'avg_delay_prior_all'] = prior_invoices_partner['payment_overdue_days'].mean()
-            df.loc[df["id"] == id, 'avg_payment_term_prior_invoices'] = prior_invoices_partner['term'].mean()
+            df.loc[df["id"] == id, 'avg_payment_term_prior_invoices'] = prior_invoices_partner['term_rounded'].mean()
 
-    def _update_date_features(self, dataset, df, id, row):
+
+    def _update_date_features(self, df, id, row):
         """
         Actualiza las características relacionadas con las fechas de vencimiento.
         """
@@ -153,11 +161,12 @@ class FeatureEngineering:
 
         # Vencimiento en los últimos 3 días del mes
         if due_day > days_in_month - 3:
-            dataset.loc[dataset["id"] == id, 'due_last_three_days_month'] = True
+            df.loc[df["id"] == id, 'due_last_three_days_month'] = True
 
         # Vencimiento en la segunda quincena del mes
         if due_day > 15:
             df.loc[df["id"] == id, 'due_date_second_half_month'] = True
+
 
     def _update_outstanding_features(self, df, id, outstanding_invoices_partner):
         """
@@ -186,6 +195,7 @@ class FeatureEngineering:
                     late_outstanding_invoices_partner['amount_total_eur'].sum() / outstanding_invoices_partner['amount_total_eur'].sum()
                 )
 
+
     def _map_days_to_term(self, days: int) -> str:
         """
         Mapea los días de término de pago a categorías redondeadas.
@@ -203,6 +213,7 @@ class FeatureEngineering:
         else:
             return ">90"
 
+
     def _assign_delay_categories(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Asigna categorías de retraso basadas en los días de retraso en el pago.
@@ -211,6 +222,7 @@ class FeatureEngineering:
         df['payment_overdue_category'] = df['payment_overdue_days'].apply(self._categorize_delay)
         return df
     
+
     def _categorize_delay(self, days: int) -> str:
         """
         Mapea los días de retraso a categorías.
