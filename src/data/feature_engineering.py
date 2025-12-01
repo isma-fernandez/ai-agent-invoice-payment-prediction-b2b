@@ -22,9 +22,6 @@ class FeatureEngineering:
             12514: "Poland"
         }
         
-        # Facturas parciales que realmente estan pagadas (residuales muy bajos)
-        self.partial_to_paid_invoice_ids = [174403, 149233, 139026, 104262, 47707]
-        
         """
 
         # Clientes duplicados
@@ -35,9 +32,7 @@ class FeatureEngineering:
 
         # % de facturas a eliminar según días de retraso
         self.outlier_percentile = 0.995
-
-        # Facturas parciales que realmente estan pagadas (residuales muy bajos)
-        self.partial_to_paid_invoice_ids = [174403, 149233, 139026, 104262, 47707]
+        self.partial_to_paid_threshold = 0.5
 
         self.__currency_rates = {}
 
@@ -122,17 +117,29 @@ class FeatureEngineering:
     
     def _clean_payment_state(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
+
         # Elimina facturas revertidas
-        df = df[df['payment_state'] != 'reversed']        
+        df = df[df['payment_state'] != 'reversed']  
+
         # Convertir 'in_payment' a 'paid'
         df['payment_state'] = df['payment_state'].replace('in_payment', 'paid')
-        # Convertir facturas parciales específicas a 'paid'
-        df.loc[df['id'].isin(self.partial_to_paid_invoice_ids), 'payment_state'] = 'paid'
+
+        # Convertir facturas parciales específicas a 'paid' y eliminar 'partial' restantes
+        df = self._fix_partial_to_paid_invoices(df)
+        df = df.drop(columns=['amount_residual'])
+
         # Convertir 'partial' restantes a 'not_paid'
         df['payment_state'] = df['payment_state'].replace('partial', 'not_paid')
         
         return df
     
+    def _fix_partial_to_paid_invoices(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df.loc[(df['payment_state'] == 'partial') & (df['amount_residual'] 
+            < self.partial_to_paid_threshold), 'payment_state'] = 'paid'
+        return df
+        
+
     def _convert_amounts_to_eur(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
         
