@@ -83,8 +83,7 @@ class FeatureEngineering:
         df[['due_last_three_days_month', 'due_date_second_half_month']] = False
 
         return df
-
-    # TODO: Refactorizar este método, es muy largo y poco eficiente
+    
     def _calculate_historical_features(self, dataset: pd.DataFrame, unpaid_invoices_df: pd.DataFrame) -> pd.DataFrame:
         """
         Calcula las características históricas para cada factura en el dataset.
@@ -93,60 +92,99 @@ class FeatureEngineering:
         df = df.sort_values(by='invoice_date', ascending=True).reset_index(drop=True)
 
         grouped_partner = df.groupby("partner_id")
-        for index, row in df.iterrows():
+
+        for _, row in df.iterrows():
             partner_id = row['partner_id']
             id = row['id']
             invoices_partner = grouped_partner.get_group(partner_id)
+            
             prior_invoices_partner = invoices_partner[invoices_partner['invoice_date'] < row['invoice_date']]
-            late_prior_invoices_partner = prior_invoices_partner[prior_invoices_partner['payment_overdue_days'] > 0]
-            if len(prior_invoices_partner) > 0:
-                df.loc[df["id"] == id, 'avg_invoiced_prior'] = prior_invoices_partner['amount_total_eur'].mean()
-                df.loc[df["id"] == id, 'num_prior_invoices'] = len(prior_invoices_partner)
-                df.loc[df["id"] == id, 'total_invoice_amount_prior'] = prior_invoices_partner['amount_total_eur'].sum()
-                if len(late_prior_invoices_partner) > 0:
-                    df.loc[df["id"] == id, 'num_late_prior_invoices'] = len(late_prior_invoices_partner)
-                    df.loc[df["id"] == id, 'ratio_late_prior_invoices'] = (
-                        len(late_prior_invoices_partner) / len(prior_invoices_partner)
-                    )
-                    df.loc[df["id"] == id, 'total_invoice_amount_late_prior'] = late_prior_invoices_partner['amount_total_eur'].sum()
-                    df.loc[df["id"] == id, 'ratio_invoice_amount_late_prior'] = (
-                        late_prior_invoices_partner['amount_total_eur'].sum() / prior_invoices_partner['amount_total_eur'].sum()
-                    )
-                    df.loc[df["id"] == id, 'avg_delay_prior_late_invoices'] = late_prior_invoices_partner['payment_overdue_days'].mean()
-                    df.loc[df["id"] == id, 'avg_delay_prior_all'] = prior_invoices_partner['payment_overdue_days'].mean()
-                    due_day = row['invoice_date_due'].day
-                    month = row['invoice_date_due'].month
-                    year = row['invoice_date_due'].year
-                    # sumo 1 mes, resto un dia y obtengo el ultimo dia del mes original
-                    days_in_month = (pd.Timestamp(year, month % 12 + 1, 1) - pd.Timedelta(days=1)).day 
-                    if due_day > days_in_month - 3:
-                        dataset.loc[dataset["id"] == id, 'due_last_three_days_month'] = True
-                    if due_day > 15:
-                        df.loc[df["id"] == id, 'due_date_second_half_month'] = True
-                    df.loc[df["id"] == id, 'avg_payment_term_prior_invoices'] = prior_invoices_partner['term'].mean()
+
+            # Características de facturas previas
+            self._update_prior_invoices_features(df, id, prior_invoices_partner)
+
+            # Características de fechas de vencimiento
+            self._update_date_features(dataset, df, id, row)
+
+            # Características de facturas pendientes
             outstanding_invoices_partner = (unpaid_invoices_df[(unpaid_invoices_df['partner_id'] == partner_id) 
                                                                 & (unpaid_invoices_df['invoice_date'] < row['invoice_date'])])
-            if len(outstanding_invoices_partner) > 0:
-                df.loc[df["id"] == id, 'num_outstanding_invoices'] = len(outstanding_invoices_partner)
-                late_outstanding_invoices_partner = (outstanding_invoices_partner[
-                    outstanding_invoices_partner['invoice_date_due'] < pd.Timestamp(2025, 3, 12)
-                    ])
-                if len(late_outstanding_invoices_partner) > 0:
-                    df.loc[df["id"] == id, 'num_outstanding_invoices_late'] = len(late_outstanding_invoices_partner)
-                    df.loc[df["id"] == id, 'ratio_outstanding_invoices_late'] = (
-                        len(late_outstanding_invoices_partner) / len(outstanding_invoices_partner)
-                    )
-                    df.loc[df["id"] == id, 'total_invoice_amount_outstanding'] = (
-                        outstanding_invoices_partner['amount_total_eur'].sum()
-                    )
-                    df.loc[df["id"] == id, 'total_invoice_amount_outstanding_late'] = (
-                        late_outstanding_invoices_partner['amount_total_eur'].sum()
-                    )
-                    df.loc[df["id"] == id, 'ratio_invoice_amount_outstanding_late'] = (
-                        late_outstanding_invoices_partner['amount_total_eur'].sum() / outstanding_invoices_partner['amount_total_eur'].sum()
-                    )
-        df['paid_late'] = df['payment_overdue_days'] > 0
+            self._update_outstanding_features(df, id, outstanding_invoices_partner)
+            
         return df
+
+    def _update_prior_invoices_features(self, df, id, prior_invoices_partner):
+        """
+        Actualiza las características relacionadas con facturas previas.
+        """
+        late_prior_invoices_partner = prior_invoices_partner[prior_invoices_partner['payment_overdue_days'] > 0]
+        # Si hay facturas previas
+        if len(prior_invoices_partner) > 0:
+            df.loc[df["id"] == id, 'avg_invoiced_prior'] = prior_invoices_partner['amount_total_eur'].mean()
+            df.loc[df["id"] == id, 'num_prior_invoices'] = len(prior_invoices_partner)
+            df.loc[df["id"] == id, 'total_invoice_amount_prior'] = prior_invoices_partner['amount_total_eur'].sum()
+
+            # Si hay facturas previas pagadas con retraso
+            if len(late_prior_invoices_partner) > 0:
+                df.loc[df["id"] == id, 'num_late_prior_invoices'] = len(late_prior_invoices_partner)
+                df.loc[df["id"] == id, 'ratio_late_prior_invoices'] = (
+                    len(late_prior_invoices_partner) / len(prior_invoices_partner)
+                )
+                df.loc[df["id"] == id, 'total_invoice_amount_late_prior'] = late_prior_invoices_partner['amount_total_eur'].sum()
+                df.loc[df["id"] == id, 'ratio_invoice_amount_late_prior'] = (
+                    late_prior_invoices_partner['amount_total_eur'].sum() / prior_invoices_partner['amount_total_eur'].sum()
+                )
+                df.loc[df["id"] == id, 'avg_delay_prior_late_invoices'] = late_prior_invoices_partner['payment_overdue_days'].mean()
+
+            # Característica promedio de retraso
+            df.loc[df["id"] == id, 'avg_delay_prior_all'] = prior_invoices_partner['payment_overdue_days'].mean()
+            df.loc[df["id"] == id, 'avg_payment_term_prior_invoices'] = prior_invoices_partner['term'].mean()
+
+    def _update_date_features(self, dataset, df, id, row):
+        """
+        Actualiza las características relacionadas con las fechas de vencimiento.
+        """
+        due_day = row['invoice_date_due'].day
+        month = row['invoice_date_due'].month
+        year = row['invoice_date_due'].year
+
+        # sumo 1 mes, resto un dia y obtengo el ultimo dia del mes original
+        days_in_month = (pd.Timestamp(year, month % 12 + 1, 1) - pd.Timedelta(days=1)).day 
+
+        # Vencimiento en los últimos 3 días del mes
+        if due_day > days_in_month - 3:
+            dataset.loc[dataset["id"] == id, 'due_last_three_days_month'] = True
+
+        # Vencimiento en la segunda quincena del mes
+        if due_day > 15:
+            df.loc[df["id"] == id, 'due_date_second_half_month'] = True
+
+    def _update_outstanding_features(self, df, id, outstanding_invoices_partner):
+        """
+        Actualiza las características relacionadas con facturas pendientes.
+        """
+        # Si hay facturas pendientes
+        if len(outstanding_invoices_partner) > 0:
+            df.loc[df["id"] == id, 'num_outstanding_invoices'] = len(outstanding_invoices_partner)
+            late_outstanding_invoices_partner = (outstanding_invoices_partner[
+                outstanding_invoices_partner['invoice_date_due'] < pd.Timestamp(2025, 3, 12)
+                ])
+            
+            # Si hay facturas vencidas pendientes
+            if len(late_outstanding_invoices_partner) > 0:
+                df.loc[df["id"] == id, 'num_outstanding_invoices_late'] = len(late_outstanding_invoices_partner)
+                df.loc[df["id"] == id, 'ratio_outstanding_invoices_late'] = (
+                    len(late_outstanding_invoices_partner) / len(outstanding_invoices_partner)
+                )
+                df.loc[df["id"] == id, 'total_invoice_amount_outstanding'] = (
+                    outstanding_invoices_partner['amount_total_eur'].sum()
+                )
+                df.loc[df["id"] == id, 'total_invoice_amount_outstanding_late'] = (
+                    late_outstanding_invoices_partner['amount_total_eur'].sum()
+                )
+                df.loc[df["id"] == id, 'ratio_invoice_amount_outstanding_late'] = (
+                    late_outstanding_invoices_partner['amount_total_eur'].sum() / outstanding_invoices_partner['amount_total_eur'].sum()
+                )
 
     def _map_days_to_term(self, days: int) -> str:
         """
