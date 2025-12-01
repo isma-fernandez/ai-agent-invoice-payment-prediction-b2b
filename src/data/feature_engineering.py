@@ -59,6 +59,24 @@ class FeatureEngineering:
 
         return df.reset_index(drop=True)
 
+    def generate_complete_dataset(self, paid_invoices_df: pd.DataFrame, unpaid_invoices_df: pd.DataFrame, 
+                                  partners_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Genera el dataset completo uniendo facturas y partners, y crea las características históricas.
+        """
+        dataset = paid_invoices_df.copy()
+
+        # Inicializar características históricas
+        dataset = self._init_historical_features(dataset)
+
+        # Calcular características históricas
+        dataset = self._calculate_historical_features(dataset, unpaid_invoices_df)
+
+        return dataset.reset_index(drop=True)
+        
+
+
+
 
 
     def clean_raw_data(self, invoices_df: pd.DataFrame, partners_df: pd.DataFrame = None) -> pd.DataFrame:
@@ -72,6 +90,87 @@ class FeatureEngineering:
 
         return invoices_cleaned, partners_cleaned
 
+    def _init_historical_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Inicializa las columnas de características históricas.
+        """
+        df = df.copy()
+
+        feature_cols = [
+            'avg_invoiced_prior', 'num_prior_invoices', 'num_late_prior_invoices', 
+            'ratio_late_prior_invoices', 'total_invoice_amount_prior', 
+            'total_invoice_amount_late_prior', 'ratio_invoice_amount_late_prior',
+            'avg_delay_prior_late_invoices', 'avg_delay_prior_all', 
+            'num_outstanding_invoices', 'num_outstanding_invoices_late',
+            'ratio_outstanding_invoices_late', 'total_invoice_amount_outstanding', 
+            'total_invoice_amount_outstanding_late', 'ratio_invoice_amount_outstanding_late',
+            'avg_payment_term_prior_invoices', 'due_last_three_days_month', 'due_date_second_half_month'
+        ]
+        df[feature_cols] = 0.0
+        df[['due_last_three_days_month', 'due_date_second_half_month']] = False
+
+        return df
+
+
+    def _calculate_historical_features(self, dataset: pd.DataFrame, unpaid_invoices_df: pd.DataFrame) -> pd.DataFrame:
+        df = dataset.copy()
+        df = df.sort_values(by='invoice_date', ascending=True).reset_index(drop=True)
+
+        grouped_partner = df.groupby("partner_id")
+        for index, row in df.iterrows():
+            partner_id = row['partner_id']
+            id = row['id']
+            invoices_partner = grouped_partner.get_group(partner_id)
+            prior_invoices_partner = invoices_partner[invoices_partner['invoice_date'] < row['invoice_date']]
+            late_prior_invoices_partner = prior_invoices_partner[prior_invoices_partner['payment_overdue_days'] > 0]
+            if len(prior_invoices_partner) > 0:
+                df.loc[df["id"] == id, 'avg_invoiced_prior'] = prior_invoices_partner['amount_total_eur'].mean()
+                df.loc[df["id"] == id, 'num_prior_invoices'] = len(prior_invoices_partner)
+                df.loc[df["id"] == id, 'total_invoice_amount_prior'] = prior_invoices_partner['amount_total_eur'].sum()
+                if len(late_prior_invoices_partner) > 0:
+                    df.loc[df["id"] == id, 'num_late_prior_invoices'] = len(late_prior_invoices_partner)
+                    df.loc[df["id"] == id, 'ratio_late_prior_invoices'] = (
+                        len(late_prior_invoices_partner) / len(prior_invoices_partner)
+                    )
+                    df.loc[df["id"] == id, 'total_invoice_amount_late_prior'] = late_prior_invoices_partner['amount_total_eur'].sum()
+                    df.loc[df["id"] == id, 'ratio_invoice_amount_late_prior'] = (
+                        late_prior_invoices_partner['amount_total_eur'].sum() / prior_invoices_partner['amount_total_eur'].sum()
+                    )
+                    df.loc[df["id"] == id, 'avg_delay_prior_late_invoices'] = late_prior_invoices_partner['payment_overdue_days'].mean()
+                    df.loc[df["id"] == id, 'avg_delay_prior_all'] = prior_invoices_partner['payment_overdue_days'].mean()
+                    due_day = row['invoice_date_due'].day
+                    month = row['invoice_date_due'].month
+                    year = row['invoice_date_due'].year
+                    # sumo 1 mes, resto un dia y obtengo el ultimo dia del mes original
+                    days_in_month = (pd.Timestamp(year, month % 12 + 1, 1) - pd.Timedelta(days=1)).day 
+                    if due_day > days_in_month - 3:
+                        dataset.loc[dataset["id"] == id, 'due_last_three_days_month'] = True
+                    if due_day > 15:
+                        df.loc[df["id"] == id, 'due_date_second_half_month'] = True
+                    df.loc[df["id"] == id, 'avg_payment_term_prior_invoices'] = prior_invoices_partner['term'].mean()
+            outstanding_invoices_partner = (unpaid_invoices_df[(unpaid_invoices_df['partner_id'] == partner_id) 
+                                                & (unpaid_invoices_df['invoice_date'] < row['invoice_date'])])
+            if len(outstanding_invoices_partner) > 0:
+                df.loc[df["id"] == id, 'num_outstanding_invoices'] = len(outstanding_invoices_partner)
+                late_outstanding_invoices_partner = (outstanding_invoices_partner[
+                    outstanding_invoices_partner['invoice_date_due'] < pd.Timestamp(2025, 3, 12)
+                    ])
+                if len(late_outstanding_invoices_partner) > 0:
+                    df.loc[df["id"] == id, 'num_outstanding_invoices_late'] = len(late_outstanding_invoices_partner)
+                    df.loc[df["id"] == id, 'ratio_outstanding_invoices_late'] = (
+                        len(late_outstanding_invoices_partner) / len(outstanding_invoices_partner)
+                    )
+                    df.loc[df["id"] == id, 'total_invoice_amount_outstanding'] = (
+                        outstanding_invoices_partner['amount_total_eur'].sum()
+                    )
+                    df.loc[df["id"] == id, 'total_invoice_amount_outstanding_late'] = (
+                        late_outstanding_invoices_partner['amount_total_eur'].sum()
+                    )
+                    df.loc[df["id"] == id, 'ratio_invoice_amount_outstanding_late'] = (
+                        late_outstanding_invoices_partner['amount_total_eur'].sum() / outstanding_invoices_partner['amount_total_eur'].sum()
+                    )
+        df['paid_late'] = df['payment_overdue_days'] > 0
+        return df
     def _clean_invoices(self, invoices_df: pd.DataFrame):
         df = invoices_df.copy()
 
