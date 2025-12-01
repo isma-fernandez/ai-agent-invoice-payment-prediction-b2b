@@ -153,7 +153,7 @@ class FeatureEngineering:
         rates = {}
         rates['COP'] = 0.00022  # Valor fijo temporal
         for currency in currencies_df:
-            if currency != 'EUR':
+            if currency != 'EUR' and currency not in rates:
                 try:
                     rate = c.get_rate(currency, 'EUR')
                     rates[currency] = rate
