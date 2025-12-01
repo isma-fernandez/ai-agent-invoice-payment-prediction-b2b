@@ -23,7 +23,7 @@ class FeatureEngineering:
         df = invoices_df.copy()
         
         # Eliminar facturas posteriores a la fecha de corte o no pagadas
-        df = df[df['payment_dates'] <= self.cutoff_date]
+        df = df[df['payment_dates'] <= pd.Timestamp(self.cutoff_date)]
 
         # Me quedo solo con las facturas pagadas
         df = df[df['payment_state'] == 'paid'].copy()
@@ -176,7 +176,7 @@ class FeatureEngineering:
         if len(outstanding_invoices_partner) > 0:
             df.loc[df["id"] == id, 'num_outstanding_invoices'] = len(outstanding_invoices_partner)
             late_outstanding_invoices_partner = (outstanding_invoices_partner[
-                outstanding_invoices_partner['invoice_date_due'] < pd.Timestamp(2025, 3, 12)
+                outstanding_invoices_partner['invoice_date_due'] < pd.Timestamp(self.cutoff_date)
                 ])
             
             # Si hay facturas vencidas pendientes

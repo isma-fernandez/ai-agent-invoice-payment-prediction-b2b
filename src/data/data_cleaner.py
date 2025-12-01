@@ -119,7 +119,7 @@ class DataCleaner:
         object_cols = df.select_dtypes(include='object').columns
         print(object_cols)
         df[object_cols] = (df[object_cols].replace({False: pd.NA, '' : pd.NA, '/' : pd.NA}))
-        df[object_cols] = df[object_cols].applymap(lambda x: np.nan if x == [] else x)
+        df[object_cols] = df[object_cols].map(lambda x: np.nan if x == [] else x)
         return df
 
 
