@@ -77,9 +77,42 @@ class FeatureEngineering:
 
         return df.reset_index(drop=True)
 
-    def _clean_partners(self, partners_df: pd.DataFrame):
-        ...
+    def _clean_partners(self, partners_df: pd.DataFrame, invoices_df: pd.DataFrame = None):
+        df = partners_df.copy()
 
+        # Convertir datos faltantes de Odoo a NaN
+        df = self._odoo_missing_values_to_null(df)
+
+        # Solo conservar clientes que son empresas
+        df = df[df['company_type'] == 'company']
+        df = df.drop(columns=['company_type'])
+
+        # Extraer datos de columnas *_id
+        df = self._split_id_name_fields(df)
+        df = df.drop(columns=['country_id'])
+
+        # Actualizar invoices_ids y columnas derivadas
+        if invoices_df:
+            df = self._fill_invoice_info(partners_df=df, invoices_df=invoices_df)
+
+        return df.reset_index(drop=True)
+
+    def _fill_invoice_info(self, partners_df: pd.DataFrame, invoices_df: pd.DataFrame) -> pd.DataFrame:
+        df = partners_df.copy()
+        invoice_counts = invoices_df.groupby('partner_id').size().to_dict()
+        # Relleno de invoice_count
+        df['invoice_count'] = df['id'].map(invoice_counts).fillna(0).astype(int)
+        # Relleno de invoice_ids
+        df['invoice_ids'] = df['id'].map(
+            lambda id: invoices_df[invoices_df['partner_id'] == id]['id'].tolist()
+        )
+        # Relleno de total_invoiced_eur
+        df['total_invoiced_eur'] = df['id'].map(
+            lambda id: invoices_df[invoices_df['partner_id'] == id]['amount_total_eur'].sum()
+        )
+        
+        return df
+    
     def _odoo_missing_values_to_null(self, df):
         """
         Convierte los valores que Odoo usa para representar datos faltantes a NaN.
