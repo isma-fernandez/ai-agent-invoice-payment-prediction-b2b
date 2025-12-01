@@ -14,16 +14,6 @@ class FeatureEngineering:
         # en producción no haría falta (día de hoy serviría).
         self.cutoff_date = cutoff_date
 
-        """# Clientes con países faltantes
-        self.missing_country_mapping = {
-            9308: "Spain",
-            13304: "Mexico",
-            14264: "France",
-            12514: "Poland"
-        }
-        
-        """
-
         # Clientes duplicados
         self.duplicate_partner_ids = [731]
 
@@ -74,6 +64,18 @@ class FeatureEngineering:
         # Convertir amount_total a EUR
         df = self._convert_amounts_to_eur(df)
 
+        # Limpiar y procesar fechas de pago
+        df = self._clean_payment_dates(df)
+        df = df.dropna(subset=['payment_dates'])
+
+        # Convertir columnas de fecha a datetime y eliminar filas sin fecha
+        df = self._convert_to_datetime(df, df.columns[df.columns.str.contains('date') & ~df.columns.str.contains('payment_dates')].tolist())
+        df = df.dropna(subset=['invoice_date', 'invoice_date_due', 'payment_dates'])
+
+        # Eliminar facturas de marketplace (no aportan información relevante)
+        df = df[~df['partner_name'].isin(self.clients_to_exclude)]
+
+        return df.reset_index(drop=True)
 
     def _clean_partners(self, partners_df: pd.DataFrame):
         ...
@@ -168,3 +170,20 @@ class FeatureEngineering:
                     print(f"Error retrieving rate for {currency}: {e}")
                     raise e
         return rates
+    
+    def _clean_payment_dates(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Limpia y procesa las fechas de pago.
+        """
+        df = df.copy()
+        
+        # Eliminar facturas pagadas sin fecha de pago
+        paid_without_date = (df['payment_dates'].isna()) & (df['payment_state'] == 'paid')
+        df = df[~paid_without_date]
+        
+        # En el caso de múltiples fechas quedarse con la primera
+        df['payment_dates'] = df['payment_dates'].astype(str).str.split(r",\s*").str[0]
+        df['payment_dates'] = df['payment_dates'].replace('nan', pd.NA)
+        
+        df = self._convert_to_datetime(df, ['payment_dates'])
+        return df
