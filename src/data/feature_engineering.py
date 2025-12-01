@@ -166,3 +166,5 @@ class FeatureEngineering:
                     rates[currency] = rate
                 except Exception as e:
                     print(f"Error retrieving rate for {currency}: {e}")
+                    raise e
+        return rates
