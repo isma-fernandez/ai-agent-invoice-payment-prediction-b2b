@@ -56,11 +56,11 @@ class DataCleaner:
 
         # Limpiar y procesar fechas de pago
         df = self._clean_payment_dates(df)
-        df = df.dropna(subset=['payment_dates'])
+        # NO hacer dropna de payment_dates: las impagadas no tienen fecha de pago
 
         # Convertir columnas de fecha a datetime y eliminar filas sin fecha
         df = self._convert_to_datetime(df, df.columns[df.columns.str.contains('date') & ~df.columns.str.contains('payment_dates')].tolist())
-        df = df.dropna(subset=['invoice_date', 'invoice_date_due', 'payment_dates'])
+        df = df.dropna(subset=['invoice_date', 'invoice_date_due'])
 
         # Eliminar facturas de marketplace (no aportan información relevante)
         df = df[~df['partner_name'].str.contains(self.clients_to_exclude)]
@@ -225,6 +225,7 @@ class DataCleaner:
     def _clean_payment_dates(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Limpia y procesa las fechas de pago.
+        Las facturas no pagadas no tienen payment_dates y eso es correcto.
         """
         df = df.copy()
         
@@ -232,8 +233,17 @@ class DataCleaner:
         paid_without_date = (df['payment_dates'].isna()) & (df['payment_state'] == 'paid')
         df = df[~paid_without_date]
         
+        # Procesar solo filas con payment_dates
+        has_date = df['payment_dates'].notna()
+        
         # En el caso de múltiples fechas quedarse con la primera
-        df['payment_dates'] = df['payment_dates'].astype(str).str.split(r",\s*").str[0]
+        df.loc[has_date, 'payment_dates'] = (
+            df.loc[has_date, 'payment_dates']
+            .astype(str)
+            .str.split(r",\s*")
+            .str[0]
+        )
+        
         df['payment_dates'] = df['payment_dates'].replace('nan', pd.NA)
         
         df = self._convert_to_datetime(df, ['payment_dates'])
