@@ -26,13 +26,42 @@ class FeatureEngineering:
 
         self.__currency_rates = {}
 
-    def process_raw_data(self, invoices_df: pd.DataFrame, partners_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def process_invoice_data_for_model(self, invoices_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Transforma los datos raw de Odoo en características derivadas
+        Transforma los datos limpios en las características que necesita el modelo.
         """
+        df = invoices_df.copy()
         
+        # Eliminar facturas posteriores a la fecha de corte o no pagadas
+        df = df[df['payment_dates'] <= self.cutoff_date]
 
-    def _clean_raw_data(self, invoices_df: pd.DataFrame, partners_df: pd.DataFrame = None) -> pd.DataFrame:
+        # Me quedo solo con las facturas pagadas
+        df = df[df['payment_state'] == 'paid'].copy()
+
+        # Eliminar facturas con fecha de vencimiento igual a fecha de factura y fecha de pago
+        df = df[df['invoice_date_due'] != df['invoice_date']]
+        df = df[df['payment_dates'] != df['invoice_date']]
+
+        # Calcular días de retraso
+        df['payment_overdue_days'] = (df['payment_dates'] - df['invoice_date_due']).dt.days
+
+        # Eliminar outliers en días de retraso
+        delay_threshold = df['payment_overdue_days'].quantile(self.outlier_percentile)
+        df = df[df['payment_overdue_days'] <= delay_threshold]
+
+        # Asigno categorias de retraso
+        df = self._assign_delay_categories(df)
+
+        # Calculo los términos de pago redondeados
+        df['payment_term_in_days'] = (df['invoice_date_due'] - df['invoice_date']).dt.days
+        df['term_rounded'] = df['payment_term_in_days'].apply(self._map_days_to_term)
+        df = df.drop(columns=['payment_term_in_days'])
+
+        return df.reset_index(drop=True)
+
+
+
+    def clean_raw_data(self, invoices_df: pd.DataFrame, partners_df: pd.DataFrame = None) -> pd.DataFrame:
         """
         Limpia los datos recibidos de la base de datos
         """
@@ -96,6 +125,33 @@ class FeatureEngineering:
             df = self._fill_invoice_info(partners_df=df, invoices_df=invoices_df)
 
         return df.reset_index(drop=True)
+
+    def _map_days_to_term(self, days: int) -> str:
+        if days <= 20:
+            return 0
+        elif days <= 40:
+            return 30
+        elif days <= 55:
+            return 45
+        elif days <= 75:
+            return 60
+        elif days <= 95:
+            return 90
+        else:
+            return ">90"
+
+    def _assign_delay_categories(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df['payment_overdue_category'] = df['payment_overdue_days'].apply(self._categorize_delay)
+        return df
+    
+    def _categorize_delay(self, days: int) -> str:
+        if days <= 0:
+            return 'Puntual'
+        elif 1 <= days <= 30:
+            return 'Leve'
+        else:
+            return 'Grave'
 
     def _fill_invoice_info(self, partners_df: pd.DataFrame, invoices_df: pd.DataFrame) -> pd.DataFrame:
         df = partners_df.copy()
