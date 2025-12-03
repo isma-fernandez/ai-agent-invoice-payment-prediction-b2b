@@ -57,7 +57,7 @@ class DataCleaner:
 
         Pasos realizados:
             1. Convierte datos faltantes de Odoo a NaN.
-            2. Separa campos *_id en dos columnas (id y name).
+            2. Separa campos ``*_id`` en dos columnas (id y name).
             3. Limpia estados de pago (paid, partial, not_paid).
             4. Elimina facturas con amount_total == 0.
             5. Convierte amount_total y amount_residual a EUR.
@@ -114,7 +114,7 @@ class DataCleaner:
         Pasos realizados:
             1. Convierte datos faltantes de Odoo a NaN.
             2. Solo conserva clientes que son empresas.
-            3. Separa campos *_id en dos columnas (id y name).
+            3. Separa campos ``*_id`` en dos columnas (id y name).
             4. Rellena invoices_ids y columnas derivadas.
 
         Args:
