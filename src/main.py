@@ -26,23 +26,20 @@ def main():
 
     # FeatureEngineering
     fe = FeatureEngineering(cutoff_date='2025-03-12')
-    paid_processed = fe.process_invoice_data_for_model(invoices_clean)
+    # Training dataset
+    X, y = fe.generate_training_dataset(invoices_clean)
+    X.to_pickle('data/X_auto.pkl')
+    y.to_pickle('data/y_auto.pkl')
+    # Agent dataset
+    agent_dataset = fe.generate_full_client_data(invoices_clean)
+    agent_dataset.to_pickle('data/agent_dataset_auto.pkl')
+    print("\n DESPUÉS DE FEATURE ENGINEERING")
+    print(f"Training dataset shape: {X.shape}")
+    print(f"Agent dataset shape: {agent_dataset.shape}")
+    print(f"Training info: {X.info()}")
+    print(f"Agent info: {agent_dataset.info()}")
 
-    print("\nDESPUÉS DE PROCESS_INVOICE_DATA")
-    print(f"Paid processed: {paid_processed.shape}")
-    print(f"\nColumnas nuevas: {[c for c in paid_processed.columns if c not in invoices_clean.columns]}")
-    print(f"\nCategorías: {paid_processed['payment_overdue_category'].value_counts()}")
 
-    # Dataset completo
-    dataset = fe.generate_complete_dataset(paid_processed, unpaid)
-
-    print("\nDATASET COMPLETO")
-    print(f"Shape: {dataset.shape}")
-    print(f"\nColumnas históricas:")
-    hist_cols = ['num_prior_invoices', 'num_late_prior_invoices', 'ratio_late_prior_invoices',
-                'avg_delay_prior_all', 'num_outstanding_invoices']
-    print(dataset[hist_cols].describe())
-    dataset.to_pickle('data/complete_dataset_auto.pkl')
 
 if __name__ == "__main__":
     main()
