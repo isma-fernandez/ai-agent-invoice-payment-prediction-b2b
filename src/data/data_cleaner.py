@@ -1,6 +1,14 @@
 import pandas as pd
 import numpy as np
-from forex_python.converter import CurrencyRates
+
+RATES = {
+            'MXN': 0.048, 
+            'USD': 0.92,   
+            'SEK': 0.087, 
+            'COP': 0.00022, 
+            'GBP': 1.17,    
+        }
+
 
 class DataCleaner:
     """
@@ -39,7 +47,10 @@ class DataCleaner:
 
         # Convertir campos *_id en dos columnas separadas
         df = self._split_id_name_fields(df)
-        self._currency_rates = self._get_currency_rates(df['currency_name'].unique().tolist())
+        print(df.columns)
+        print(df.info())
+        print(df['currency_name'].value_counts())
+        self._currency_rates = RATES
 
         # Procesar estados de pago
         df = self._clean_payment_state(df)
@@ -144,9 +155,8 @@ class DataCleaner:
         """
         id_name_fields = df.columns[df.columns.str.endswith('_id')].tolist()
         for field in id_name_fields:
-            df[field[:-3] + '_id'] = df[field].apply(lambda x: x[0] if isinstance(x, list) and len(x) == 2 else np.nan)
             df[field[:-3] + '_name'] = df[field].apply(lambda x: x[1] if isinstance(x, list) and len(x) == 2 else np.nan)
-            df = df.drop(columns=[field])
+            df[field[:-3] + '_id'] = df[field].apply(lambda x: x[0] if isinstance(x, list) and len(x) == 2 else np.nan)
         return df
 
 
@@ -164,11 +174,10 @@ class DataCleaner:
 
         # Convertir facturas parciales específicas a 'paid' y eliminar 'partial' restantes
         df = self._fix_partial_to_paid_invoices(df)
-        df = df.drop(columns=['amount_residual'])
-
+        
         # Convertir 'partial' restantes a 'not_paid'
         df['payment_state'] = df['payment_state'].replace('partial', 'not_paid')
-        
+
         return df
 
 
@@ -200,26 +209,6 @@ class DataCleaner:
         )
         
         return df
-
-
-    def _get_currency_rates(self, currencies_df: list) -> dict:
-        """
-        Obtiene las tasas de conversión a EUR para las monedas especificadas.
-        """
-        c = CurrencyRates()
-
-        rates = {}
-        rates['COP'] = 0.00022  # Valor fijo temporal
-        for currency in currencies_df:
-            if currency != 'EUR' and currency not in rates:
-                try:
-                    rate = c.get_rate(currency, 'EUR')
-                    rates[currency] = rate
-                except Exception as e:
-                    print(f"Error retrieving rate for {currency}: {e}")
-                    raise e
-        return rates
-
 
     def _clean_payment_dates(self, df: pd.DataFrame) -> pd.DataFrame:
         """
