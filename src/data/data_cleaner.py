@@ -22,7 +22,6 @@ class DataCleaner:
         Limpia los datos recibidos de la base de datos
         """
         
-
         invoices_cleaned = self._clean_invoices(invoices_df=invoices_df)
         partners_cleaned = self._clean_partners(partners_df=partners_df, invoices_df=invoices_cleaned)
 
@@ -56,7 +55,7 @@ class DataCleaner:
 
         # Limpiar y procesar fechas de pago
         df = self._clean_payment_dates(df)
-        # NO hacer dropna de payment_dates: las impagadas no tienen fecha de pago
+        # NO hacer dropna de payment_dates, las impagadas no tienen fecha de pago
 
         # Convertir columnas de fecha a datetime y eliminar filas sin fecha
         df = self._convert_to_datetime(df, df.columns[df.columns.str.contains('date') & ~df.columns.str.contains('payment_dates')].tolist())
@@ -225,7 +224,8 @@ class DataCleaner:
     def _clean_payment_dates(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Limpia y procesa las fechas de pago.
-        Las facturas no pagadas no tienen payment_dates y eso es correcto.
+        Las facturas no pagadas no tienen payment_dates y eso es 
+        necesario para el DataManager.
         """
         df = df.copy()
         
@@ -243,7 +243,7 @@ class DataCleaner:
             .str.split(r",\s*")
             .str[0]
         )
-        
+
         df['payment_dates'] = df['payment_dates'].replace('nan', pd.NA)
         
         df = self._convert_to_datetime(df, ['payment_dates'])
