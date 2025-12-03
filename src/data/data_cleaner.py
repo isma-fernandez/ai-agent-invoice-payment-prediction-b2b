@@ -1,19 +1,21 @@
 import pandas as pd
 import numpy as np
+from typing import Tuple, Optional
 
 RATES = {
-            'MXN': 0.048, 
-            'USD': 0.92,   
-            'SEK': 0.087, 
-            'COP': 0.00022, 
-            'GBP': 1.17,    
-        }
+    'MXN': 0.048, 
+    'USD': 0.92,   
+    'SEK': 0.087, 
+    'COP': 0.00022, 
+    'GBP': 1.17,    
+}
 
 
 class DataCleaner:
     """
     Clase cuya funcionalidad es la limpieza y transformación inicial de los datos de Odoo.
-    Prepara los datos para que puedan ser utilizados por el Feature Engineering.
+    Prepara los datos para que puedan ser utilizados por el Feature Engineering. 
+    Limpia TODAS las facturas (tanto pagadas como impagadas).
     """
     def __init__(self):
         # Clientes a excluir
@@ -22,23 +24,33 @@ class DataCleaner:
         # Configuración para limpieza de estados de pago
         self.partial_to_paid_threshold = 0.5
 
-        self._currency_rates = {}
+        # TODO: buscar una forma de actualizar estas tasas dinámicamente
+        self._currency_rates = RATES
 
 
-    def clean_raw_data(self, invoices_df: pd.DataFrame, partners_df: pd.DataFrame = None) -> pd.DataFrame:
+    def clean_raw_data(self, invoices_df: pd.DataFrame, 
+                       partners_df: pd.DataFrame = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Limpia los datos recibidos de la base de datos
+        Limpia los datos recibidos de la base de datos.
+        Puede utilizarse para limpiar las facturas de un solo cliente o de todos los clientes.
         """
-        
         invoices_cleaned = self._clean_invoices(invoices_df=invoices_df)
         partners_cleaned = self._clean_partners(partners_df=partners_df, invoices_df=invoices_cleaned)
 
         return invoices_cleaned, partners_cleaned
 
 
-    def _clean_invoices(self, invoices_df: pd.DataFrame):
+    def _clean_invoices(self, invoices_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Limpia los datos de facturas.
+        Limpia los datos de facturas:
+            1. Convierte datos faltantes de Odoo a NaN.
+            2. Separa campos *_id en dos columnas (id y name).
+            3. Limpia estados de pago (paid, partial, not_paid).
+            4. Elimina facturas con amount_total == 0.
+            5. Convierte amount_total y amount_residual a EUR.
+            6. Limpia y procesa fechas de pago y convierte columnas de fecha a datetime 
+            y elimina filas sin fecha.
+            7. Elimina facturas de marketplace (no aportan información relevante).
         """
         df = invoices_df.copy()
 
@@ -47,10 +59,6 @@ class DataCleaner:
 
         # Convertir campos *_id en dos columnas separadas
         df = self._split_id_name_fields(df)
-        print(df.columns)
-        print(df.info())
-        print(df['currency_name'].value_counts())
-        self._currency_rates = RATES
 
         # Procesar estados de pago
         df = self._clean_payment_state(df)
@@ -69,18 +77,26 @@ class DataCleaner:
         # NO hacer dropna de payment_dates, las impagadas no tienen fecha de pago
 
         # Convertir columnas de fecha a datetime y eliminar filas sin fecha
-        df = self._convert_to_datetime(df, df.columns[df.columns.str.contains('date') & ~df.columns.str.contains('payment_dates')].tolist())
+        date_cols = df.columns[
+            df.columns.str.contains('date') & ~df.columns.str.contains('payment_dates')
+        ].tolist()
+        df = self._convert_to_datetime(df, date_cols)
         df = df.dropna(subset=['invoice_date', 'invoice_date_due'])
 
         # Eliminar facturas de marketplace (no aportan información relevante)
-        df = df[~df['partner_name'].str.contains(self.clients_to_exclude)]
+        df = df[~df['partner_name'].str.contains(self.clients_to_exclude, na=False)]
 
         return df.reset_index(drop=True)
 
 
-    def _clean_partners(self, partners_df: pd.DataFrame, invoices_df: pd.DataFrame = None):
+    def _clean_partners(self, partners_df: pd.DataFrame, 
+                        invoices_df: pd.DataFrame = None) -> pd.DataFrame:
         """
         Limpia los datos de partners.
+            1. Convierte datos faltantes de Odoo a NaN.
+            2. Solo conserva clientes que son empresas.
+            3. Separa campos *_id en dos columnas (id y name).
+            4. Rellena invoices_ids y columnas derivadas (invoice_count, total_invoiced_eur).
         """
         df = partners_df.copy()
 
@@ -89,11 +105,11 @@ class DataCleaner:
 
         # Solo conservar clientes que son empresas
         df = df[df['company_type'] == 'company']
-        df = df.drop(columns=['company_type'])
+        df = df.drop(columns=['company_type'], errors='ignore')
 
         # Extraer datos de columnas *_id
         df = self._split_id_name_fields(df)
-        df = df.drop(columns=['country_id'])
+        df = df.drop(columns=['country_id'], errors='ignore')
 
         # Actualizar invoices_ids y columnas derivadas
         if invoices_df is not None:
@@ -102,44 +118,53 @@ class DataCleaner:
         return df.reset_index(drop=True)
 
 
-    def _fill_invoice_info(self, partners_df: pd.DataFrame, invoices_df: pd.DataFrame) -> pd.DataFrame:
+    def _fill_invoice_info(self, partners_df: pd.DataFrame, 
+                           invoices_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Rellena las columnas invoice_count, invoice_ids y total_invoiced_eur en el dataframe de partners.
+        Rellena las columnas invoice_count, invoice_ids y total_invoiced_eur.
         """
         df = partners_df.copy()
         invoice_counts = invoices_df.groupby('partner_id').size().to_dict()
-        # Relleno de invoice_count
+        
         df['invoice_count'] = df['id'].map(invoice_counts).fillna(0).astype(int)
-        # Relleno de invoice_ids
-        df['invoice_ids'] = df['id'].map(
-            lambda id: invoices_df[invoices_df['partner_id'] == id]['id'].tolist()
-        )
-        # Relleno de total_invoiced_eur
-        df['total_invoiced_eur'] = df['id'].map(
-            lambda id: invoices_df[invoices_df['partner_id'] == id]['amount_total_eur'].sum()
-        )
+        
+        invoice_ids_map = invoices_df.groupby('partner_id')['id'].apply(list).to_dict()
+        df['invoice_ids'] = df['id'].map(invoice_ids_map).apply(lambda x: x if isinstance(x, list) else [])
+        
+        total_invoiced_map = invoices_df.groupby('partner_id')['amount_total_eur'].sum().to_dict()
+        df['total_invoiced_eur'] = df['id'].map(total_invoiced_map).fillna(0)
         
         return df
 
 
-    def _odoo_missing_values_to_null(self, df):
+    def _odoo_missing_values_to_null(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Convierte los valores que Odoo usa para representar datos faltantes a NaN.
+        Estos incluyen False, cadenas vacías, '/' (nombre de facturas) y listas vacías.
         """
+        df = df.copy()
         object_cols = df.select_dtypes(include='object').columns
-        print(object_cols)
-        df[object_cols] = (df[object_cols].replace({False: pd.NA, '' : pd.NA, '/' : pd.NA}))
-        df[object_cols] = df[object_cols].map(lambda x: np.nan if x == [] else x)
+        
+        df[object_cols] = df[object_cols].replace({False: np.nan, '': np.nan, '/': np.nan})
+        
+        for col in object_cols:
+            df[col] = df[col].apply(lambda x: np.nan if isinstance(x, list) and len(x) == 0 else x)
+        
         return df
 
 
-    def _convert_to_datetime(self, df, columns):
+    def _convert_to_datetime(self, df: pd.DataFrame, columns: list) -> pd.DataFrame:
         """
         Convierte las columnas especificadas a tipo datetime.
+        Soporta formatos con '/' (dd/mm/yyyy) y otros formatos estándar.
         """
+        df = df.copy()
         for col in columns:
+            if col not in df.columns:
+                continue
             try:
-                # formato que no soporta nativamente to_datetime
+                # Formato raro que usa la empresa (no tiene sentido alguno 
+                # pero tampoco me sorprende...)
                 if df[col].astype(str).str.contains('/').any():
                     df[col] = pd.to_datetime(df[col], errors='coerce', format='%d/%m/%Y')
                 else:
@@ -149,33 +174,38 @@ class DataCleaner:
         return df
 
 
-    def _split_id_name_fields(self, df):
+    def _split_id_name_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Encuentra campos que son tuplas (id, nombre) y los separa en dos columnas.
         """
+        df = df.copy()
         id_name_fields = df.columns[df.columns.str.endswith('_id')].tolist()
+        
         for field in id_name_fields:
-            df[field[:-3] + '_name'] = df[field].apply(lambda x: x[1] if isinstance(x, list) and len(x) == 2 else np.nan)
-            df[field[:-3] + '_id'] = df[field].apply(lambda x: x[0] if isinstance(x, list) and len(x) == 2 else np.nan)
+            base_name = field[:-3]
+            
+            df[base_name + '_name'] = df[field].apply(
+                lambda x: x[1] if isinstance(x, (list, tuple)) and len(x) == 2 else np.nan
+            )
+            df[field] = df[field].apply(
+                lambda x: x[0] if isinstance(x, (list, tuple)) and len(x) == 2 else np.nan
+            )
+            
         return df
 
 
     def _clean_payment_state(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Limpia las facturas según su estado de pago.
+        - Elimina facturas con estado 'reversed'.
+        - Convierte 'in_payment' a 'paid' (en la exploración se vio que siempre eran pagadas).
+        - Convierte 'partial' a 'not_paid' o 'paid' (según el residual).
         """
         df = df.copy()
 
-        # Elimina facturas revertidas
         df = df[df['payment_state'] != 'reversed']  
-
-        # Convertir 'in_payment' a 'paid'
         df['payment_state'] = df['payment_state'].replace('in_payment', 'paid')
-
-        # Convertir facturas parciales específicas a 'paid' y eliminar 'partial' restantes
         df = self._fix_partial_to_paid_invoices(df)
-        
-        # Convertir 'partial' restantes a 'not_paid'
         df['payment_state'] = df['payment_state'].replace('partial', 'not_paid')
 
         return df
@@ -186,8 +216,8 @@ class DataCleaner:
         Ajusta el estado de pago de facturas parciales a pagadas si el residual es menor que un umbral.
         """
         df = df.copy()
-        df.loc[(df['payment_state'] == 'partial') & (df['amount_residual'] 
-            < self.partial_to_paid_threshold), 'payment_state'] = 'paid'
+        mask = (df['payment_state'] == 'partial') & (df['amount_residual'] < self.partial_to_paid_threshold)
+        df.loc[mask, 'payment_state'] = 'paid'
         return df
 
 
@@ -197,35 +227,33 @@ class DataCleaner:
         """
         df = df.copy()
     
-        # Convertir amount_total a EUR
-        df['amount_total_eur'] = df.apply(
-            lambda row: row['amount_total'] * self._currency_rates.get(row['currency_name'], 1) 
-            if row['currency_name'] != 'EUR' else row['amount_total'], axis=1
-        )
-
-        df['amount_residual_eur'] = df.apply(
-            lambda row: row['amount_residual'] * self._currency_rates.get(row['currency_name'], 1) 
-            if row['currency_name'] != 'EUR' else row['amount_residual'], axis=1
-        )
+        def convert_to_eur(row, amount_col):
+            currency = row.get('currency_name', 'EUR')
+            amount = row[amount_col]
+            if currency != 'EUR' and currency in self._currency_rates:
+                return amount * self._currency_rates[currency]
+            return amount
+    
+        df['amount_total_eur'] = df.apply(lambda row: convert_to_eur(row, 'amount_total'), axis=1)
+        df['amount_residual_eur'] = df.apply(lambda row: convert_to_eur(row, 'amount_residual'), axis=1)
         
         return df
+
 
     def _clean_payment_dates(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Limpia y procesa las fechas de pago.
-        Las facturas no pagadas no tienen payment_dates y eso es 
-        necesario para el DataManager.
+        - Elimina facturas marcadas como pagadas pero sin fecha de pago.
+        - Si hay múltiples fechas, conserva solo la primera.
+        - Convierte la columna a tipo datetime.
         """
         df = df.copy()
         
-        # Eliminar facturas pagadas sin fecha de pago
         paid_without_date = (df['payment_dates'].isna()) & (df['payment_state'] == 'paid')
         df = df[~paid_without_date]
         
-        # Procesar solo filas con payment_dates
         has_date = df['payment_dates'].notna()
         
-        # En el caso de múltiples fechas quedarse con la primera
         df.loc[has_date, 'payment_dates'] = (
             df.loc[has_date, 'payment_dates']
             .astype(str)
@@ -233,7 +261,7 @@ class DataCleaner:
             .str[0]
         )
 
-        df['payment_dates'] = df['payment_dates'].replace('nan', pd.NA)
+        df['payment_dates'] = df['payment_dates'].replace('nan', np.nan)
         
         df = self._convert_to_datetime(df, ['payment_dates'])
         return df
