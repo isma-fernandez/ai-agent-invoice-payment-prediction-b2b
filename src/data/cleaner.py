@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from typing import Tuple
 
+# TODO: Añadir ejemplos de uso en docstrings
+
 RATES = {
     'MXN': 0.048, 
     'USD': 0.92,   
@@ -20,6 +22,7 @@ class DataCleaner:
     Attributes:
         clients_to_exclude (str): Nombre o patrón de clientes a excluir (ej. "Marketplace").
         partial_to_paid_threshold (float): Valor residual máximo para considerar una factura pagada.
+    
     """
 
     def __init__(self):

@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from typing import Optional, Tuple
 
+# TODO: Añadir ejemplos de uso en docstrings
+
 class FeatureEngineering:
     """Transformación de datos limpios de Odoo en características para el modelo.
 
@@ -13,6 +15,7 @@ class FeatureEngineering:
         HISTORICAL_FEATURES (list): Lista de características calculadas basadas en el historial.
         cutoff_date (pd.Timestamp): Fecha de corte para los cálculos.
         outlier_percentile (float): Percentil utilizado para filtrar outliers (0.995).
+
     """
     
     # Características del modelo
