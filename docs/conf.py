@@ -1,13 +1,6 @@
 import os
 import sys
 
-# Necesario para mostrar métodos privados en la documentación
-autodoc_default_options = {
-    "members": True,
-    "undoc-members": True,
-    "private-members": True 
-}
-
 # Evitar errores de importación para módulos externos no instalados
 autodoc_mock_imports = [
     "pandas",

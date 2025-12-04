@@ -256,13 +256,7 @@ class FeatureEngineering:
 
     def _calculate_historical_features_for_invoice(self, df: pd.DataFrame, idx: int,
         paid_invoices_df: pd.DataFrame, unpaid_invoices_df: pd.DataFrame) -> None:
-        """Calcula características históricas para una factura específica.
-
-        Args:
-            df (pd.DataFrame): DataFrame principal donde se actualizarán los datos.
-            idx (int): Índice de la factura actual en el DataFrame.
-            paid_invoices_df (pd.DataFrame): Historial de facturas pagadas.
-            unpaid_invoices_df (pd.DataFrame): Historial de facturas impagadas.
+        """Calcula características históricas para una factura específica..
         """
         row = df.loc[idx]
         partner_id = row['partner_id']
@@ -285,13 +279,6 @@ class FeatureEngineering:
     def _add_payment_features(self, df: pd.DataFrame, 
                               calculate_overdue: bool = True) -> pd.DataFrame:
         """Añade características de pago: payment_overdue_days, term_rounded.
-
-        Args:
-            df (pd.DataFrame): DataFrame a procesar.
-            calculate_overdue (bool, optional): Si True, calcula días de retraso. Defaults to True.
-
-        Returns:
-            pd.DataFrame: DataFrame con las nuevas columnas.
         """
         df = df.copy()
         
@@ -310,14 +297,7 @@ class FeatureEngineering:
 
     def _add_date_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Añade características de fecha.
-        
         Añade: due_last_three_days_month, due_date_second_half_month.
-
-        Args:
-            df (pd.DataFrame): DataFrame a procesar.
-
-        Returns:
-            pd.DataFrame: DataFrame con las nuevas columnas booleanas.
         """
         df = df.copy()
         df['due_last_three_days_month'] = df['invoice_date_due'].apply(self._is_last_three_days)
@@ -327,12 +307,6 @@ class FeatureEngineering:
 
     def _init_historical_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Inicializa las columnas de características históricas a 0.
-
-        Args:
-            df (pd.DataFrame): DataFrame a inicializar.
-
-        Returns:
-            pd.DataFrame: DataFrame con columnas históricas en 0.0.
         """
         df = df.copy()
         df[self.HISTORICAL_FEATURES] = 0.0
@@ -342,13 +316,6 @@ class FeatureEngineering:
     def _update_prior_invoices_features(self, df: pd.DataFrame, idx: int, 
                                         prior_invoices: pd.DataFrame) -> None:
         """Calcula las características relacionadas con facturas previas pagadas.
-        
-        Actualiza el DataFrame 'df' in-place en la posición 'idx'.
-
-        Args:
-            df (pd.DataFrame): DataFrame principal.
-            idx (int): Índice de la fila a actualizar.
-            prior_invoices (pd.DataFrame): Subset de facturas previas pagadas.
         """
         if len(prior_invoices) == 0:
             return
@@ -374,11 +341,6 @@ class FeatureEngineering:
     def _update_outstanding_features(self, df: pd.DataFrame, idx: int, 
                                      outstanding_invoices: pd.DataFrame) -> None:
         """Calcula las características relacionadas con facturas pendientes (outstanding).
-
-        Args:
-            df (pd.DataFrame): DataFrame principal.
-            idx (int): Índice de la fila a actualizar.
-            outstanding_invoices (pd.DataFrame): Subset de facturas pendientes.
         """
         if len(outstanding_invoices) == 0:
             return
@@ -401,12 +363,6 @@ class FeatureEngineering:
 
     def _assign_delay_categories(self, df: pd.DataFrame) -> pd.DataFrame:
         """Asigna categorías de retraso basadas en payment_overdue_days.
-
-        Args:
-            df (pd.DataFrame): DataFrame con columna 'payment_overdue_days'.
-
-        Returns:
-            pd.DataFrame: DataFrame con columna 'payment_overdue_category'.
         """
         df = df.copy()
         if 'payment_overdue_days' in df.columns:
@@ -416,17 +372,11 @@ class FeatureEngineering:
 
     def _categorize_delay(self, days) -> str:
         """Mapea los días de retraso a categorías.
-        
         Categorías:
             - Puntual: days <= 0
             - Leve: 1 <= days <= 30
             - Grave: days > 30
 
-        Args:
-            days (float): Número de días de retraso.
-
-        Returns:
-            str: Categoría ('Puntual', 'Leve', 'Grave') o None.
         """
         if pd.isna(days):
             return None
@@ -440,12 +390,6 @@ class FeatureEngineering:
 
     def _is_last_three_days(self, date) -> bool:
         """Determina si la fecha está en los últimos 3 días del mes.
-
-        Args:
-            date (pd.Timestamp): Fecha a evaluar.
-
-        Returns:
-            bool: True si es uno de los últimos 3 días del mes.
         """
         if pd.isna(date):
             return False
@@ -462,12 +406,6 @@ class FeatureEngineering:
 
     def _map_days_to_term(self, days) -> int:
         """Mapea los días de término de pago a categorías redondeadas (bins).
-
-        Args:
-            days (int): Días de término de pago.
-
-        Returns:
-            int: Categoría redondeada (0, 30, 45, 60, 90, 120).
         """
         if pd.isna(days):
             return 30
