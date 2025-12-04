@@ -1,5 +1,5 @@
 import pandas as pd
-from src.data.data_cleaner import DataCleaner
+from src.data.cleaner import DataCleaner
 from src.data.feature_engineering import FeatureEngineering
 
 

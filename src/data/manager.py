@@ -5,8 +5,8 @@ from pathlib import Path
 import joblib
 
 from .odoo_connector import OdooConnection
-from .data_retriever import DataRetriever
-from .data_cleaner import DataCleaner
+from .retriever import DataRetriever
+from .cleaner import DataCleaner
 from .feature_engineering import FeatureEngineering
 
 class DataManager:
@@ -31,11 +31,6 @@ class DataManager:
         self._models: Dict[str, Any] = {}
         self._transformations: Dict[str, Any] = {}
 
-        # Datos en memoria
-        self._invoices_df: Optional[pd.DataFrame] = None
-        self._partners_df: Optional[pd.DataFrame] = None
-        self._unpaid_invoices_df: Optional[pd.DataFrame] = None
-
     async def connect(self) -> None:
         """
         Establece la conexión con Odoo.
@@ -44,24 +39,18 @@ class DataManager:
         await self._odoo_connection.connect()
         self._data_retriever = DataRetriever(odoo_connection=self._odoo_connection)
 
-    async def retrieve_data_from_odoo(self) -> None:
+    def load_model(self, model_path: str) -> None:
         """
-        Recupera los datos de Odoo y los almacena en memoria.
+        Carga el modelo de predicción desde el disco.
+        # TODO: Mejorar para múltiples modelos
+        # TODO: Añadir ruta y nombre a la configuración
         """
-        if not self._data_retriever:
-            raise RuntimeError("La conexión a Odoo no está establecida.")
+        model = joblib.load(model_path)
+        self._models['invoice_risk_model'] = model
 
-        # Datos crudos
-        invoices_raw = await self._data_retriever.get_invoices()
-        partners_raw = await self._data_retriever.get_partners()
-        invoices_raw_df = pd.DataFrame(invoices_raw)
-        partners_raw_df = pd.DataFrame(partners_raw)
-
-        # Limpieza de datos
-        invoices_cleaned_df, partners_cleaned_df = self._cleaner.clean_raw_data(
-            invoices_df=invoices_raw_df,
-            partners_df=partners_raw_df
-        )
-
-        self._invoices_df = invoices_cleaned_df
-        self._partners_df = partners_cleaned_df
+    def is_data_ready(self) -> bool:
+        """
+        Verifica si los datos necesarios están cargados y listos para su uso.
+        """
+        return self._invoices_df is not None and self._partners_df is not None
+    

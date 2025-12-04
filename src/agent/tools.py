@@ -1,6 +1,6 @@
 from langchain_core.tools import tool
 from src.data.odoo_connector import OdooConnection
-from src.data.data_models import Invoice, Partner
+from src.data.models import Invoice, Partner
 
 odoo_connector = OdooConnection()
 
