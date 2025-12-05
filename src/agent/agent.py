@@ -1,23 +1,11 @@
 from config.settings import settings
-from langchain_mistralai import ChatMistralAI
+from .graph import Graph
 
-API_MISTRAL_KEY = settings.API_MISTRAL_KEY
+class FinancialAgent:
+    def __init__(self):
+        self.api_key = settings.API_MISTRAL_KEY
+        self.graph = Graph()
 
-LLM = ChatMistralAI(
-    model="mistral-small-latest",
-    temperature=0,
-    max_retries=2,
-    api_key=API_MISTRAL_KEY,
-)
-
-MESSAGES = [
-    (
-        "system",
-        "You are a helpful assistant.",
-    ),
-    ("human", "Cuáles son las posibilidades de que te caiga un rayo?"),
-]
-
-def test_mistral_ai():
-    ai_msg = LLM.invoke(MESSAGES)
-    print(ai_msg)
+    def process_request(self, request: str) -> str:
+        responses = self.graph.run(request)
+        return responses      

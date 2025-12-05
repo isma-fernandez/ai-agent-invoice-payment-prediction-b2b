@@ -1,7 +1,7 @@
 import pandas as pd
 from src.data.cleaner import DataCleaner
 from src.data.feature_engineering import FeatureEngineering
-from src.agent.agent import test_mistral_ai
+from src.agent.agent import FinancialAgent
 
 def test_data_processing():
     # Cargar datos
@@ -39,9 +39,15 @@ def test_data_processing():
     print(f"Training info: {X.info()}")
     print(f"Agent info: {agent_dataset.info()}")
     
+def test_agent():
+    agent = FinancialAgent()
+    user_input = input("Introduce el mensaje: ")
+    response = agent.process_request(user_input)
+    print("\nRESPUESTA DEL AGENTE:")
+    print(response)
 
 def main():
-    test_mistral_ai()
+    test_agent()
 
 
 if __name__ == "__main__":

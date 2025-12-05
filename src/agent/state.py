@@ -1,11 +1,11 @@
 import operator
-from typing import Annotated, List, TypedDict
-from langchain_core.messages import BaseMessage
+from typing import Annotated, TypedDict
+from langgraph.graph import add_messages
 
 class AgentState(TypedDict):
     # Historial del chat (inputs cliente, pensamientos y outputs (herramientas, msgs) del agente)
-    # metadatos operator.add para indicar a langgraph no sobrescribir esta variable
-    messages: Annotated[List[BaseMessage], operator.add]
+    # add_messages para indicar a langgraph no sobrescribir esta variable
+    messages: Annotated[list, add_messages]
     
     client_id: str | None
     # Puntual - Leve - Grave (TODO: Cambiar nombres)
