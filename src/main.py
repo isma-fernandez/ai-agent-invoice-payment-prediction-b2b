@@ -1,9 +1,9 @@
 import pandas as pd
 from src.data.cleaner import DataCleaner
 from src.data.feature_engineering import FeatureEngineering
+from src.agent.agent import test_mistral_ai
 
-
-def main():
+def test_data_processing():
     # Cargar datos
     invoices_raw = pd.read_pickle('data/outbound_invoices.pkl')
     partners_raw = pd.read_pickle('data/partners.pkl')
@@ -38,7 +38,10 @@ def main():
     print(f"Agent dataset shape: {agent_dataset.shape}")
     print(f"Training info: {X.info()}")
     print(f"Agent info: {agent_dataset.info()}")
+    
 
+def main():
+    test_mistral_ai()
 
 
 if __name__ == "__main__":

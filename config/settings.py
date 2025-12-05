@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     ODOO_DB: str
     ODOO_USERNAME: str
     ODOO_PASSWORD: str
+    API_MISTRAL_KEY: str
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
