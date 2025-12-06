@@ -123,7 +123,7 @@ class DataManager:
         
         return clean_data if clean_data else None
 
-    async def search_clients(self, query: str, limit: int = 10) -> pd.DataFrame:
+    async def search_clients(self, query: str, limit: int = 5) -> pd.DataFrame:
         """
         Busca clientes por nombre.
         
@@ -134,23 +134,23 @@ class DataManager:
         Returns:
             DataFrame con columnas: id, name, country
         """
-        # TODO: Falta implementar método en DataRetriever
 
-        ...
-        
-        return None
+        raw_data = await self._data_retriever.search_client_by_name(query, limit)
+        df = None
+        if raw_data:
+            df = pd.DataFrame(raw_data)
+        return df
 
     async def get_all_partners(self) -> pd.DataFrame:
         """
         Obtiene todos los clientes.
+        Útil para entrenar nuevos modelos.
         
         Returns:
             DataFrame con todos los partners y sus campos.
         """
         raw_data = await self._data_retriever.get_all_customer_partners()
         
-        # TODO: Aquí hay que hacer algo para poder limpiar los datos del cliente 
-        # sin necesidad de las facturas
         
         return pd.DataFrame(raw_data) if raw_data else pd.DataFrame()
     
