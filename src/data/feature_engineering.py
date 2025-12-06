@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 # TODO: Añadir ejemplos de uso en docstrings
 
@@ -387,6 +387,39 @@ class FeatureEngineering:
         else:
             return 'Grave'
 
+
+    def calculate_client_stats(self, invoices_df: pd.DataFrame) -> Dict[str, Any]:
+        """Calcula estadísticas de un cliente a partir de sus facturas.
+        
+        Args:
+            invoices_df: DataFrame con facturas del cliente.
+            
+        Returns:
+            Dict con estadísticas del cliente.
+        """
+        if invoices_df.empty:
+            return {}
+        
+        paid_df = invoices_df[invoices_df['payment_state'] == 'paid']
+        unpaid_df = invoices_df[invoices_df['payment_state'] == 'not_paid']
+        paid_count = len(paid_df)
+        overdue_df = unpaid_df[unpaid_df['invoice_date_due'] < self.cutoff_date]
+        on_time_ratio = 0.0
+        avg_delay_days = 0.0
+        if paid_count > 0:
+            on_time_ratio = round((~paid_df['paid_late']).sum() / paid_count, 4)
+            avg_delay_days = round(float(paid_df['payment_overdue_days'].mean()), 2)
+        
+        return {
+            'total_invoices': len(invoices_df),
+            'paid_invoices': paid_count,
+            'unpaid_invoices': len(unpaid_df),
+            'overdue_invoices': len(overdue_df),
+            'total_invoiced_eur': round(float(invoices_df['amount_total_eur'].sum()), 2),
+            'total_outstanding_eur': round(float(unpaid_df['amount_residual_eur'].sum()), 2),
+            'on_time_ratio': on_time_ratio,
+            'avg_delay_days': avg_delay_days,
+        }
 
     def _is_last_three_days(self, date) -> bool:
         """Determina si la fecha está en los últimos 3 días del mes.

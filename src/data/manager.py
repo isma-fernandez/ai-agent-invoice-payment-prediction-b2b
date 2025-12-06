@@ -2,14 +2,17 @@ import pandas as pd
 import numpy as np
 from typing import Optional, Tuple, Dict, List, Any
 from pathlib import Path
+from datetime import date
 import joblib
 
 from .odoo_connector import OdooConnection
 from .retriever import DataRetriever
 from .cleaner import DataCleaner
 from .feature_engineering import FeatureEngineering
-
-#TODO: Añadir ejemplos de uso en docstrings
+from .models import (
+    ClientSearchResult, ClientInfo, InvoiceSummary, 
+    PredictionResult, RiskCategory, PaymentState
+)
 
 class DataManager:
     """
@@ -65,65 +68,45 @@ class DataManager:
         # TODO: Soporte para múltiples modelos
         model = joblib.load(model_path)
         self._models['invoice_risk_model'] = model
+        self._model = model
 
 
-    async def get_client_invoices(self, partner_id: int) -> pd.DataFrame:
+    async def _get_client_invoices_df(self, partner_id: int) -> pd.DataFrame:
         """Obtiene todas las facturas de un cliente y calcula las características
-        derivadas.
-        
-        Args:
-            partner_id: ID del cliente en Odoo.
-            
-        Returns:
-            DataFrame con columnas:
-            - Datos originales: id, name, partner_id, partner_name, company_name,
-              currency_name, amount_total_eur, amount_residual_eur, payment_state,
-              invoice_date, invoice_date_due, payment_dates
-            - Características derivadas: payment_overdue_days, payment_term_days,
-              avg_invoiced_prior, num_prior_invoices, ratio_late_prior_invoices,
-              avg_delay_prior_all, num_outstanding_invoices, etc.
-            
-            DataFrame vacío si no hay facturas.
-        """
-        
-        # Dattos raw de Odoo
+        derivadas."""
+
         raw_data = await self._data_retriever.get_invoices_by_partner(partner_id) 
         if not raw_data:
             return pd.DataFrame()
         
-        # Limpieza de los datos
         df = pd.DataFrame(raw_data)
         clean_data, _ = self._cleaner.clean_raw_data(df)
 
-        if not clean_data:
+        if clean_data is None or clean_data.empty:
             return pd.DataFrame()
         
-        # Cálculo de características derivadas
         dataset = self._feature_engineering.generate_full_client_data(clean_data)
         return dataset
 
 
-    async def get_invoice(self, invoice_id: int) -> Optional[pd.Series]:
+    async def _get_invoice_df(self, invoice_id: int) -> Optional[pd.DataFrame]:
         """
-        Obtiene una factura específica.
-        
-        Args:
-            invoice_id: ID de la factura en Odoo.
-            
-        Returns:
-            DataFrame con todos los campos de la factura o None si no existe.
-        """
+        Obtiene una factura específica."""
         raw_data = await self._data_retriever.get_invoice_by_id(invoice_id)  
         if not raw_data:
             return None
         
-        # Limpieza de los datos
         df = pd.DataFrame([raw_data])
         clean_data, _ = self._cleaner.clean_raw_data(df)
         
-        return clean_data if clean_data else None
+        if clean_data is None or clean_data.empty:
+            return None
+            
+        return clean_data
 
-    async def search_clients(self, query: str, limit: int = 5) -> pd.DataFrame:
+
+    # NOTA: Se utiliza para encontrar el ID de un cliente a partir de su nombre
+    async def search_clients(self, query: str, limit: int = 5) -> List[ClientSearchResult]:
         """
         Busca clientes por nombre.
         
@@ -132,15 +115,41 @@ class DataManager:
             limit: Máximo de resultados.
             
         Returns:
-            DataFrame con columnas: id, name, country
+            Lista de ClientSearchResult con los clientes encontrados.
         """
-
         raw_data = await self._data_retriever.search_client_by_name(query, limit)
-        df = None
-        if raw_data:
-            df = pd.DataFrame(raw_data)
-        return df
+        if not raw_data:
+            return []
+        results = [ClientSearchResult(id=record['id'], name=record['name']) for record in raw_data]
+        
+        return results
 
+    # NOTA: Una vez tenemos el ID del cliente, obtenemos su info
+    async def get_client_info(self, partner_id: int) -> Optional[ClientInfo]:
+        """
+        Obtiene información y estadísticas agregadas de un cliente.
+        
+        Args:
+            partner_id: ID del cliente en Odoo.
+            
+        Returns:
+            ClientInfo con estadísticas del cliente o None si no existe.
+        """
+        df = await self._get_client_invoices_df(partner_id)
+        
+        if df.empty:
+            return None
+        
+        stats = self._feature_engineering.calculate_client_stats(df)
+        
+        return ClientInfo(
+            id=partner_id,
+            name=df['partner_name'].iloc[0],
+            country_name=df.get('country_name', pd.Series([None])).iloc[0],
+            **stats
+        )
+
+    # NOTA: Realmente solo sirve para entrenar nuevos modelos
     async def get_all_partners(self) -> pd.DataFrame:
         """
         Obtiene todos los clientes.
@@ -151,10 +160,11 @@ class DataManager:
         """
         raw_data = await self._data_retriever.get_all_customer_partners()
         
-        
         return pd.DataFrame(raw_data) if raw_data else pd.DataFrame()
     
-    async def predict(self, invoice_id: int) -> Dict[str, Any]:
+
+    # TODO: El raise puede traer problemas
+    async def predict(self, invoice_id: int) -> PredictionResult:
         """
         Predice el riesgo de impago de una factura.
         Devuelve también información para explicabilidad.
@@ -163,54 +173,55 @@ class DataManager:
             invoice_id: id de la factura a predecir.
             
         Returns:
-            Dict con:
+            PredictionResult con:
             - invoice_id, invoice_name, partner_id, partner_name, amount_eur
             - prediction: clase predicha Puntual, Leve, Grave
             - probabilities: dict con probabilidad por clase
-            - risk_level: ALTO, MEDIO, BAJO
-            - error: mensaje si algo falla
+            
+        Raises:
+            ValueError: Si la factura no existe.
         """  
-        # Obtener factura
-        invoice = await self.get_invoice(invoice_id)
-        if invoice is None:
-            return {'error': f'Factura {invoice_id} no encontrada'} 
-        # Obtener información del cliente
+        invoice_df = await self._get_invoice_df(invoice_id)
+        if invoice_df is None:
+            raise ValueError(f"La factura con ID {invoice_id} no existe.")
+        
+        invoice = invoice_df.iloc[0]
+        
         partner_id = invoice['partner_id']
         if isinstance(partner_id, (list, tuple)):
             partner_id = partner_id[0]  
-        # Obtener historial del cliente
-        client_invoices = await self.get_client_invoices(partner_id)
+        client_invoices = await self._get_client_invoices_df(partner_id)
         history = client_invoices[client_invoices['id'] != invoice_id]
         
-        # Preparar datos para el modelo
         X = self._feature_engineering.process_invoice_for_prediction(
             new_invoice=invoice,
             client_invoices_df=history
         )
         
-        # Predecir
         prediction = self._model.predict(X)[0]
         probabilities = self._model.predict_proba(X)[0]
         classes = self._model.classes_
         prob_dict = {
-            str(clase): prob 
+            str(clase): round(float(prob), 4)
             for clase, prob in zip(classes, probabilities)
         }
         
-        return {
-            'invoice_id': invoice_id,
-            'invoice_name': invoice['name'],
-            'partner_id': partner_id,
-            'partner_name': invoice['partner_name'],
-            'amount_eur': round(float(invoice['amount_total_eur']), 2),
-            'due_date': invoice['invoice_date_due'],
-            'prediction': str(prediction),
-            'probabilities': prob_dict,
-        }
+        return PredictionResult(
+            partner_id=int(partner_id),
+            partner_name=invoice['partner_name'],
+            is_hypothetical=False,
+            invoice_id=invoice_id,
+            invoice_name=invoice['name'],
+            amount_eur=round(float(invoice['amount_total_eur']), 2),
+            due_date=invoice['invoice_date_due'].date() if pd.notna(invoice['invoice_date_due']) else None,
+            prediction=RiskCategory(prediction),
+            probabilities=prob_dict
+        )
+
 
     async def predict_hypothetical(
             self, partner_id: int, amount_eur: float, invoice_date: str = None,
-            due_date: str = None, payment_term_days: int = 30) -> Dict[str, Any]:
+            due_date: str = None, payment_term_days: int = 30) -> PredictionResult:
         """
         Predice riesgo para una factura que aún no se ha creado.
         
@@ -224,22 +235,25 @@ class DataManager:
             payment_term_days: Días de plazo de pago (valor por defecto: 30).
             
         Returns:
-            Dict con predicción
+            PredictionResult con la predicción o None si el cliente no tiene historial de facturas.
         """
         # TODO: No soporta diferentes monedas aún
         # TODO: No tiene sentido si el cliente no tiene historial de facturas,
         # hay que tratar ese caso aparte.
         
-        invoice_date = pd.Timestamp(invoice_date) if invoice_date else pd.Timestamp.now()
+        invoice_date_ts = pd.Timestamp(invoice_date) if invoice_date else pd.Timestamp.now()
         if due_date:
-            due_date = pd.Timestamp(due_date)
+            due_date_ts = pd.Timestamp(due_date)
         else:
-            due_date = invoice_date + pd.Timedelta(days=payment_term_days)
+            due_date_ts = invoice_date_ts + pd.Timedelta(days=payment_term_days)
         
-        # Historial del cliente
-        history = await self.get_client_invoices(partner_id)
-        partner_name = history['partner_name'].iloc[0] if len(history) > 0 else 'Unknown'
-        company_name = history['company_name'].iloc[0] if len(history) > 0 else 'Unknown'
+        history = await self._get_client_invoices_df(partner_id)
+        
+        if history.empty:
+            return None
+        
+        partner_name = history['partner_name'].iloc[0]
+        company_name = history['company_name'].iloc[0]
         
         hypothetic_invoice = pd.Series({
             'id': -1,
@@ -250,13 +264,12 @@ class DataManager:
             'currency_name': 'EUR',
             'amount_total_eur': amount_eur,
             'amount_residual_eur': amount_eur,
-            'invoice_date': invoice_date,
-            'invoice_date_due': due_date,
+            'invoice_date': invoice_date_ts,
+            'invoice_date_due': due_date_ts,
             'payment_dates': pd.NaT,
             'payment_state': 'not_paid',
         })
         
-        # Características y predecir
         X = self._feature_engineering.process_invoice_for_prediction(
             new_invoice=hypothetic_invoice,
             client_invoices_df=history
@@ -266,23 +279,63 @@ class DataManager:
         probabilities = self._model.predict_proba(X)[0]   
         classes = self._model.classes_
         prob_dict = {
-            str(clases): round(float(prob), 4) 
-            for clases, prob in zip(classes, probabilities)
+            str(clase): round(float(prob), 4) 
+            for clase, prob in zip(classes, probabilities)
         }
         
-        return {
-            'hypothetic': True,
-            'partner_id': partner_id,
-            'partner_name': partner_name,
-            'amount_eur': round(amount_eur, 2),
-            'invoice_date': invoice_date.strftime('%Y-%m-%d'),
-            'due_date': due_date.strftime('%Y-%m-%d'),
-            'payment_term_days': payment_term_days,
-            'prediction': str(prediction),
-            'probabilities': prob_dict,
-        }
-
-
-
-
-
+        return PredictionResult(
+            partner_id=partner_id,
+            partner_name=partner_name,
+            is_hypothetical=True,
+            invoice_id=None,
+            invoice_name=None,
+            amount_eur=round(amount_eur, 2),
+            due_date=due_date_ts.date(),
+            prediction=RiskCategory(prediction),
+            probabilities=prob_dict
+        )
+    
+    async def get_client_invoices(self, partner_id: int, limit: int = 20, 
+                                   only_unpaid: bool = False) -> List[InvoiceSummary]:
+        """Obtiene las facturas de un cliente para el agente.
+        
+        Args:
+            partner_id: ID del cliente en Odoo.
+            limit: Máximo de facturas a devolver.
+            only_unpaid: Si True, solo devuelve facturas pendientes de pago.
+            
+        Returns:
+            Lista de InvoiceSummary ordenada por fecha (más recientes primero).
+        """
+        df = await self._get_client_invoices_df(partner_id)
+        
+        if df.empty:
+            return []
+        
+        if only_unpaid:
+            df = df[df['payment_state'] == 'not_paid']
+        
+        df = df.head(limit)
+        
+        cutoff = pd.Timestamp(self.cutoff)
+        invoices = []
+        for _, row in df.iterrows():
+            days_overdue = None
+            if row['payment_state'] == 'not_paid' and pd.notna(row['invoice_date_due']):
+                if row['invoice_date_due'] < cutoff:
+                    days_overdue = (cutoff - row['invoice_date_due']).days
+            
+            invoices.append(InvoiceSummary(
+                id=int(row['id']),
+                name=row['name'],
+                amount_eur=round(float(row['amount_total_eur']), 2),
+                invoice_date=row['invoice_date'].date() if pd.notna(row['invoice_date']) else None,
+                due_date=row['invoice_date_due'].date() if pd.notna(row['invoice_date_due']) else None,
+                payment_state=PaymentState(row['payment_state']),
+                payment_date=row['payment_dates'].date() if pd.notna(row.get('payment_dates')) else None,
+                paid_late=bool(row['paid_late']) if pd.notna(row.get('paid_late')) else None,
+                delay_days=int(row['payment_overdue_days']) if pd.notna(row.get('payment_overdue_days')) else None,
+                days_overdue=days_overdue
+            ))
+        
+        return invoices

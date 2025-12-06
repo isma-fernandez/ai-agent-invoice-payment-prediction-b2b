@@ -1,170 +1,94 @@
-from pydantic import BaseModel, EmailStr, field_validator
-from datetime import date, datetime
-from typing import List, Tuple, Any
+# src/data/models.py
+from pydantic import BaseModel, Field
+from datetime import date
+from typing import Optional, Dict
+from enum import Enum
 
-# TODO: Esto se debe cambiar para seguir con el modelo de datos del predictor
 
-# account.move
-class Invoice(BaseModel):
+class RiskCategory(str, Enum):
+    PUNTUAL = "Puntual"
+    LEVE = "Leve"
+    GRAVE = "Grave"
+
+
+class PaymentState(str, Enum):
+    PAID = "paid"
+    NOT_PAID = "not_paid"
+
+
+class ClientSearchResult(BaseModel):
+    """Resultado de búsqueda de clientes."""
     id: int
-    name: str | None  # Nombre de la factura
-    move_type: str | None  # Tipo de movimiento (out_invoice, in_invoice, etc.)
-    payment_state: str | None  # Estado del pago (paid, not_paid, partial)
-    company_id: Tuple[int, str] | None  # Empresa relacionada [id, nombre]
-    partner_id: Tuple[int, str] | None  # Cliente o proveedor [id, nombre]
-    currency_id: Tuple[int, str] | None  # Moneda utilizada [id, nombre]
-    amount_total: float | None  # Monto total
-    amount_residual: float | None  # Monto pendiente
-    invoice_date: date | None = None  # Fecha de la factura 
-    invoice_date_due: date | None  # Fecha de vencimiento
-    journal_id: Tuple[int, str] | None  # Diario asociado [id, nombre]
-    payment_dates: date | None | str  # Fechas de pago asociadas a la factura
+    name: str
 
-    # Campos adicionales fuera del modelo Odoo
-    paid_late: bool | None = None  # Indica si se pagó tarde
-    days_overdue: int | None = -1  # Días de retraso en el pago
 
-    @field_validator("payment_dates", mode="before")
-    def empty_str_to_none(cls, v):
-        """
-        Convierte cadenas vacías o valores falsos en None.
-        Además convierte fechas con formato DD/MM/YYYY a date.
-        TODO: ya me dirás tú por qué tienen dos formatos de fecha distintos en Odoo (magic)
-        """
-        if not v or v is False or v == "":
-            return None
-        elif isinstance(v, date):
-            return v
-        elif isinstance(v, str):
-            try:
-                if "/" in v:
-                    return datetime.strptime(v, "%d/%m/%Y").date()
-            except ValueError:
-                return None
-        return v
-    
-    @field_validator("invoice_date", mode="before")
-    def parse_invoice_date(cls, v):
-        """
-        Convierte cadenas vacías o valores falsos en None.
-        Además convierte fechas con formato DD/MM/YYYY a date.
-        """
-        if not v or v is False or v == "":
-            return None
-        elif isinstance(v, date):
-            return v
-        elif isinstance(v, str):
-            try:
-                if "/" in v:
-                    return datetime.strptime(v, "%d/%m/%Y").date()
-            except ValueError:
-                return None
-        return v
-    
-    @field_validator("invoice_date_due", mode="before")
-    def parse_invoice_date_due(cls, v):
-        """
-        Convierte cadenas vacías o valores falsos en None.
-        Además convierte fechas con formato DD/MM/YYYY a date.
-        """
-        if not v or v is False or v == "":
-            return None
-        elif isinstance(v, date):
-            return v
-        elif isinstance(v, str):
-            try:
-                if "/" in v:
-                    return datetime.strptime(v, "%d/%m/%Y").date()
-            except ValueError:
-                return None
-        return v
-    
-    @field_validator("partner_id", mode="before")
-    def validate_partner_id(cls, v):
-        """
-        Asegura que partner_id es una tupla (id, nombre).
-        Si no se asigna un partner_id, Odoo devuelve False (qué sentido tiene eso?).
-        """
-        if not v or v is False:
-            return None
-        elif isinstance(v, list) and len(v) == 2:
-            return (v[0], v[1])
-        # No suele pasar, pero por si acaso
-        elif isinstance(v, tuple) and len(v) == 2:
-            return v
-        return None
-
-    def model_post_init(self, context):
-        if self.payment_state == 'paid' and self.payment_dates and self.invoice_date_due:
-            days_late = (self.payment_dates - self.invoice_date_due).days
-            self.days_overdue = max(0, days_late)
-            self.paid_late = days_late > 0
-
-    def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
-
-# res.partner
-class Partner(BaseModel):
+class ClientInfo(BaseModel):
+    """Información y estadísticas del cliente."""
     id: int
-    name: str | None  # Nombre del cliente o proveedor
-    email: EmailStr | None  # Correo electrónico
-    phone: str | None  # Teléfono
-    street: str | None  # Calle
-    city: str | None  # Ciudad
-    zip: str | None  # Código postal
-    country_id: Tuple[int, str] | None  # País [id, nombre]
-    vat: str | None  # Número de identificación fiscal
-    customer_rank: int | None  # Rango de cliente (>0 si es cliente)
-    supplier_rank: int | None  # Rango de proveedor (>0 si es proveedor)
-    category_id: List[Tuple[int, str]] | None  # Categorías asociadas
-    credit: float | None  # Dinero que debe
-    credit_limit: float | None  # Límite de crédito
-    invoice_ids: List[int] | None  # IDs de facturas asociadas
-    total_invoiced: float | None  # Monto total facturado
-    unpaid_invoices_count: int | None  # Número de facturas impagas
-    unpaid_invoice_ids: List[int] | None  # IDs de facturas impagadas
+    name: str
+    country_name: Optional[str] = None
+    total_invoices: int
+    total_invoiced_eur: float
+    paid_invoices: int
+    unpaid_invoices: int
+    overdue_invoices: int
+    total_outstanding_eur: float
+    on_time_ratio: float 
+    avg_delay_days: float  
 
-    def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
 
-# res.partner.category
-class PartnerCategory(BaseModel):
+class InvoiceSummary(BaseModel):
+    """Resumen de factura para el agente."""
     id: int
-    name: str  # Nombre de la categoría
+    name: str
+    amount_eur: float
+    invoice_date: date
+    due_date: date
+    payment_state: PaymentState
+    payment_date: Optional[date] = None
+    paid_late: Optional[bool] = None
+    delay_days: Optional[int] = None 
+    days_overdue: Optional[int] = None  
 
-    def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
 
-# res.partner.industry
-class PartnerIndustry(BaseModel):
-    id: int
-    name: str  # Nombre de la industria / sector
+class PredictionResult(BaseModel):
+    """Resultado de predicción de riesgo de impago."""
+    partner_id: int
+    partner_name: str
+    is_hypothetical: bool = False
+    invoice_id: Optional[int] = None  # None si hipotética
+    invoice_name: Optional[str] = None
+    amount_eur: float
+    due_date: date
+    prediction: RiskCategory
+    probabilities: Dict[str, float] 
 
-    def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
-    
-# res.company
-class Company(BaseModel):
-    id: int
-    name: str  # Nombre de la empresa
-    currency_id: Tuple[int, str]  # Moneda de la empresa [id, nombre]
 
-    def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
+class SearchClientInput(BaseModel):
+    """Input para buscar clientes por nombre."""
+    query: str = Field(description="Nombre o parte del nombre del cliente a buscar")
+    limit: int = Field(default=5, ge=1, le=20, description="Máximo de resultados")
 
-# res.currency
-class Currency(BaseModel):
-    id: int
-    name: str  # Nombre de la moneda
 
-    def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
+class GetClientInfoInput(BaseModel):
+    """Input para obtener información de un cliente."""
+    partner_id: int = Field(description="ID del cliente en el sistema")
 
-# res.country
-class Country(BaseModel):
-    id: int
-    name: str  # Nombre del país
-    code: str  # Código ISO del país
 
-    def to_dict(self) -> dict[str, Any]:
-        return self.model_dump()
+class GetClientInvoicesInput(BaseModel):
+    """Input para obtener facturas de un cliente."""
+    partner_id: int = Field(description="ID del cliente")
+    limit: int = Field(default=0, description="Máximo de facturas a devolver")
+    only_unpaid: bool = Field(default=False, description="Solo facturas pendientes de pago")
+
+
+class PredictInvoiceInput(BaseModel):
+    """Input para predecir riesgo de una factura existente."""
+    invoice_id: int = Field(description="ID de la factura")
+
+
+class PredictHypotheticalInput(BaseModel):
+    """Input para predecir riesgo de una factura hipotética."""
+    partner_id: int = Field(description="ID del cliente")
+    amount_eur: float = Field(description="Importe de la factura en EUR", gt=0)
+    payment_term_days: int = Field(default=30, ge=1, description="Días de plazo de pago")

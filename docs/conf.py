@@ -9,7 +9,9 @@ autodoc_mock_imports = [
     "pydantic",
     "pydantic_settings",
     "email_validator",  
-    "mcp_odoo"          
+    "mcp_odoo",
+    "langgraph", 
+    "langchain_core"
 ]
 
 # Definir variables de entorno dummy para que Pydantic no falle al importar
