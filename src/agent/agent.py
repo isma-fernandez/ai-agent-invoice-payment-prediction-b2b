@@ -6,7 +6,6 @@ class FinancialAgent:
     def __init__(self):
         self.api_key = settings.API_MISTRAL_KEY
         self.graph = Graph()
-        self.tools = tools
 
     def process_request(self, request: str) -> str:
         responses = self.graph.run(request)

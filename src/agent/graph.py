@@ -3,6 +3,8 @@ from langgraph.graph import StateGraph, START, END
 from langchain_mistralai import ChatMistralAI
 from config.settings import settings
 from langchain_core.messages import SystemMessage
+from langgraph.prebuilt import ToolNode
+from .tools import tools
 
 SYSTEM_PROMPT = """Eres un asistente financiero especializado en análisis de riesgo de impago de facturas B2B.
 
@@ -34,26 +36,41 @@ Responde en español."""
 
 class Graph:
     def __init__(self):
-        self.graph = self._build_graph()
-
+        self.tools = ToolNode(tools)
         self.llm = ChatMistralAI(
             model="mistral-large-latest",
             temperature=0,
             max_retries=2,
             api_key=settings.API_MISTRAL_KEY,
         )
-
-        #TODO: añadir tools
+        self.graph = self._build_graph()
     
-
     def _build_graph(self):
         """Construye el grafo de estados del agente financiero."""
+        # Arquitectura ReAct
+        #   1. Comienza en START y va a "chatbot"
+        #   2. Desde "chatbot", decide si usar una herramienta o terminar (END)
+        #   3. Si usa una herramienta, va a "tools" y luego regresa a "chatbot"
+        #   4. Repite hasta decidir terminar
         self.graph_builder = StateGraph(AgentState)
         self.graph_builder.add_edge(START, "chatbot")
         self.graph_builder.add_node("chatbot", self._chatbot)
-        self.graph_builder.add_edge("chatbot", END)
+        self.graph_builder.add_node("tools", self.tools)
+        self.graph_builder.add_conditional_edges(
+            "chatbot",
+            self._condition_tools_or_end,
+            {"tools": "tools", END: END},
+        )
+        self.graph_builder.add_edge("tools", "chatbot")
         return self.graph_builder.compile()
 
+    def _condition_tools_or_end(self, state: AgentState) -> str:
+        """Decide si usar una herramienta o terminar la conversación."""
+        last_message = state["messages"][-1].content
+
+        if hasattr(last_message, "tool_calls"):
+            return "tools"
+        return END
 
     def _chatbot(self, state: AgentState):
         messages = state["messages"]
