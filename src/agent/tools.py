@@ -32,8 +32,8 @@ async def get_client_invoices(partner_id: int, limit: int, only_unpaid: bool) ->
     Se puede especificar un límite de facturas a devolver y si se quieren
     solo las facturas pendientes de pago.
     Esto incluye ID de factura, nombre, monto en EUR, fecha de factura,
-    fecha de vencimiento, estado de pago, fecha de pago (si aplica),
-    si se pagó tarde (si aplica), días de retraso (si aplica) y días de vencimiento (si aplica).
+    fecha de vencimiento, estado de pago, fecha de pago,
+    si se pagó tarde, días de retraso y días de vencimiento.
     """
     return await data_manager.get_client_invoices(partner_id=partner_id, limit=limit, only_unpaid=only_unpaid)
 
