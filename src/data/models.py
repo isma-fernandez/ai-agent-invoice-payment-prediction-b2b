@@ -67,28 +67,29 @@ class PredictionResult(BaseModel):
 class SearchClientInput(BaseModel):
     """Input para buscar clientes por nombre."""
     query: str = Field(description="Nombre o parte del nombre del cliente a buscar")
-    limit: int = Field(default=5, ge=1, le=20, description="Máximo de resultados")
+    limit: int = Field(default=5, description="Máximo de resultados")
 
 
 class GetClientInfoInput(BaseModel):
     """Input para obtener información de un cliente."""
     partner_id: int = Field(description="ID del cliente en el sistema")
 
-
-class GetClientInvoicesInput(BaseModel):
-    """Input para obtener facturas de un cliente."""
-    partner_id: int = Field(description="ID del cliente")
-    limit: int = Field(default=0, description="Máximo de facturas a devolver")
+class GetClientInvoicesInfoInput(BaseModel):
+    """Input para obtener información de facturas de un cliente."""
+    partner_id: int = Field(description="ID del cliente en el sistema")
+    limit: int = Field(default=5, description="Máximo de facturas a devolver")
     only_unpaid: bool = Field(default=False, description="Solo facturas pendientes de pago")
-
 
 class PredictInvoiceInput(BaseModel):
     """Input para predecir riesgo de una factura existente."""
     invoice_id: int = Field(description="ID de la factura")
 
+class GetInvoiceByName(BaseModel):
+    """Input para obtener una factura por su nombre."""
+    invoice_name: str = Field(description="Nombre de la factura")
 
 class PredictHypotheticalInput(BaseModel):
     """Input para predecir riesgo de una factura hipotética."""
     partner_id: int = Field(description="ID del cliente")
     amount_eur: float = Field(description="Importe de la factura en EUR", gt=0)
-    payment_term_days: int = Field(default=30, ge=1, description="Días de plazo de pago")
+    payment_term_days: int = Field(default=30, description="Días de plazo de pago")

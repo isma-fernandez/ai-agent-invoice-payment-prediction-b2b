@@ -46,6 +46,29 @@ class DataRetriever:
         )
         return records
 
+    async def search_invoice_by_name(self, invoice_name: str):
+        """
+        Busca una factura por su nombre.
+
+        Args:
+            invoice_name (str): Nombre de la factura a buscar.
+        Returns:
+            dict | None: Registro de la factura si se encuentra, None en caso contrario.
+        """
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+        
+        domain = [('name', 'ilike', invoice_name), ('move_type', '=', 'out_invoice')]
+        records = await self.odoo_connection.search_read(
+            model='account.move', 
+            domain=domain, 
+            fields=INVOICE_FIELDS, 
+            limit=1
+        )
+        if records:
+            return records[0]
+        return None
+    
     async def get_all_outbound_invoices_by_company(self, company_id: int):
         """
         Recupera todas las facturas de salida para una empresa dada.

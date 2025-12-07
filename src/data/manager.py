@@ -295,6 +295,46 @@ class DataManager:
             probabilities=prob_dict
         )
     
+    async def get_invoice_by_name(self, invoice_name: str) -> Optional[InvoiceSummary]:
+        """Recupera una factura por su nombre.
+        
+        Args:
+            invoice_name: Nombre de la factura a buscar.
+            
+        Returns:
+            InvoiceSummary si se encuentra, None en caso contrario.
+        """
+        raw_data = await self._data_retriever.search_invoice_by_name(invoice_name)
+        if not raw_data:
+            return None
+        
+        df = pd.DataFrame([raw_data])
+        clean_data, _ = self._cleaner.clean_raw_data(df)
+        
+        if clean_data is None or clean_data.empty:
+            return None
+        
+        row = clean_data.iloc[0]
+        
+        days_overdue = None
+        if row['payment_state'] == 'not_paid' and pd.notna(row['invoice_date_due']):
+            cutoff = pd.Timestamp(self.cutoff)
+            if row['invoice_date_due'] < cutoff:
+                days_overdue = (cutoff - row['invoice_date_due']).days
+
+        return InvoiceSummary(
+            id=int(row['id']),
+            name=row['name'],
+            amount_eur=round(float(row['amount_total_eur']), 2),
+            invoice_date=row['invoice_date'].date() if pd.notna(row['invoice_date']) else None,
+            due_date=row['invoice_date_due'].date() if pd.notna(row['invoice_date_due']) else None,
+            payment_state=PaymentState(row['payment_state']),
+            payment_date=row['payment_dates'].date() if pd.notna(row.get('payment_dates')) else None,
+            paid_late=bool(row['paid_late']) if pd.notna(row.get('paid_late')) else None,
+            delay_days=int(row['payment_overdue_days']) if pd.notna(row.get('payment_overdue_days')) else None,
+            days_overdue=days_overdue
+        )
+
     async def get_client_invoices(self, partner_id: int, limit: int = 20, 
                                    only_unpaid: bool = False) -> List[InvoiceSummary]:
         """Obtiene las facturas de un cliente para el agente.
