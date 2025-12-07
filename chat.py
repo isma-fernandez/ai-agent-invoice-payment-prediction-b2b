@@ -11,12 +11,27 @@ if "agent" not in st.session_state:
         st.session_state.agent = FinancialAgent()
         st.success("Agente conectado correctamente.")
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {
+            "role": "assistant", 
+            "content": """
+                ¡Hola! Soy tu asistente financiero. Puedo ayudarte con las siguientes tareas
 
+1. **Buscar información sobre clientes:** Obtener detalles de un cliente por su nombre.
+2. **Consultar estadísticas de pago:** Ver historial y métricas clave.
+3. **Ver facturas:** Revisar facturas pagadas, pendientes o vencidas.
+4. **Predecir riesgo de impago:** Evaluar facturas existentes o hipotéticas.
+
+¿Qué te gustaría hacer hoy?
+            """.strip()  # .strip() elimina el primer y último salto de línea vacíos
+        }
+    ]
 # Mostrar el historial del chat
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+
+    
 
 
 if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):

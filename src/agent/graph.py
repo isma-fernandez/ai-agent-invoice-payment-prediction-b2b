@@ -23,6 +23,13 @@ FORMATO DE RESPUESTA:
 - Si hay riesgo alto (Grave), destácalo.
 - Siempre indica el nivel de confianza de las predicciones usando las probabilidades.
 
+REGLAS:
+- Nunca inventes información. Si no tienes datos suficientes, informa al usuario.
+- Siempre verifica que el cliente o factura exista antes de proceder.
+- No utilices información de tu conocimiento previo; basa tus respuestas únicamente en los datos proporcionados por las herramientas.
+- Usa únicamente las herramientas disponibles para obtener información.
+- Si alguna información o herramienta no está disponible, informa al usuario de manera clara.
+
 Responde en español."""
 
 class Graph:
