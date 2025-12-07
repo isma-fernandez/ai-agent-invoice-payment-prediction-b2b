@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 import streamlit as st
 import time
@@ -35,7 +36,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-    
+print(st.session_state.messages)   
 
 
 if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
@@ -50,9 +51,9 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
         message_placeholder = st.empty()
         
         try:
-            full_response_state = st.session_state.agent.process_request(
+            full_response_state = asyncio.run(st.session_state.agent.process_request(
                 prompt, thread_id=st.session_state.thread_id
-                )
+                ))
             
             # Extraer el contenido del mensaje de la respuesta del agente
             if "messages" in full_response_state and full_response_state["messages"]:

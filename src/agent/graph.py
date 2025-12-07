@@ -45,7 +45,8 @@ class Graph:
             temperature=0,
             max_retries=2,
             api_key=settings.API_MISTRAL_KEY,
-        )
+        ).bind_tools(tools)
+
         self.memory = MemorySaver()
         self.graph = self._build_graph()
         
@@ -73,7 +74,7 @@ class Graph:
         """Decide si usar una herramienta o terminar la conversación."""
         last_message = state["messages"][-1]
 
-        if hasattr(last_message, "tool_calls"):
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools"
         return END
 
@@ -87,7 +88,7 @@ class Graph:
         result = self.llm.invoke(messages)
         return {"messages": [result]}
     
-    def run(self, request: str, thread_id: str) -> AgentState:
+    async def run(self, request: str, thread_id: str) -> AgentState:
         config = {"configurable": {"thread_id": thread_id}}
         initial_state: AgentState = {
             "messages": [{"role": "human", "content": request}],
@@ -95,5 +96,5 @@ class Graph:
             "risk_category": None,
             "explanation": None,
         }
-        final_state = self.graph.invoke(initial_state, config=config)
+        final_state = await self.graph.ainvoke(initial_state, config=config)
         return final_state
