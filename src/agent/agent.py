@@ -7,6 +7,6 @@ class FinancialAgent:
         self.api_key = settings.API_MISTRAL_KEY
         self.graph = Graph()
 
-    def process_request(self, request: str) -> str:
-        responses = self.graph.run(request)
+    def process_request(self, request: str, thread_id: str) -> str:
+        responses = self.graph.run(request=request, thread_id=thread_id)
         return responses      

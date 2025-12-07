@@ -1,3 +1,4 @@
+import uuid
 import streamlit as st
 import time
 from src.agent.agent import FinancialAgent
@@ -6,6 +7,9 @@ from src.agent.agent import FinancialAgent
 st.title("Asistente de facturación")
 
 # Inicializar el agente financiero y el estado del chat
+
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = str(uuid.uuid4())
 if "agent" not in st.session_state:
     with st.spinner("Iniciando el agente financiero..."):
         st.session_state.agent = FinancialAgent()
@@ -46,7 +50,9 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
         message_placeholder = st.empty()
         
         try:
-            full_response_state = st.session_state.agent.process_request(prompt)
+            full_response_state = st.session_state.agent.process_request(
+                prompt, thread_id=st.session_state.thread_id
+                )
             
             # Extraer el contenido del mensaje de la respuesta del agente
             if "messages" in full_response_state and full_response_state["messages"]:

@@ -5,6 +5,7 @@ from config.settings import settings
 from langchain_core.messages import SystemMessage
 from langgraph.prebuilt import ToolNode
 from .tools import tools
+from langgraph.checkpoint.memory import MemorySaver
 
 SYSTEM_PROMPT = """Eres un asistente financiero especializado en análisis de riesgo de impago de facturas B2B.
 
@@ -43,7 +44,9 @@ class Graph:
             max_retries=2,
             api_key=settings.API_MISTRAL_KEY,
         )
+        self.memory = MemorySaver()
         self.graph = self._build_graph()
+        
     
     def _build_graph(self):
         """Construye el grafo de estados del agente financiero."""
@@ -62,7 +65,7 @@ class Graph:
             {"tools": "tools", END: END},
         )
         self.graph_builder.add_edge("tools", "chatbot")
-        return self.graph_builder.compile()
+        return self.graph_builder.compile(checkpointer=self.memory)
 
     def _condition_tools_or_end(self, state: AgentState) -> str:
         """Decide si usar una herramienta o terminar la conversación."""
@@ -75,18 +78,20 @@ class Graph:
     def _chatbot(self, state: AgentState):
         messages = state["messages"]
 
-        if len(messages) == 1:
-            messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
+        # Inyecto el prompt del sistema en cada llamada, necesario para
+        # evitar que el prompt se pierda en llamadas sucesivas
+        messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
         
         result = self.llm.invoke(messages)
         return {"messages": [result]}
     
-    def run(self, user_input: str) -> AgentState:
+    def run(self, request: str, thread_id: str) -> AgentState:
+        config = {"configurable": {"thread_id": thread_id}}
         initial_state: AgentState = {
-            "messages": [{"role": "human", "content": user_input}],
+            "messages": [{"role": "human", "content": request}],
             "client_id": None,
             "risk_category": None,
             "explanation": None,
         }
-        final_state = self.graph.invoke(initial_state)
+        final_state = self.graph.invoke(initial_state, config=config)
         return final_state
