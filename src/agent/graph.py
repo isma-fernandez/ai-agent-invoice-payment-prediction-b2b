@@ -37,7 +37,7 @@ class Graph:
         self.graph = self._build_graph()
 
         self.llm = ChatMistralAI(
-            model="mistral-small-latest",
+            model="mistral-large-latest",
             temperature=0,
             max_retries=2,
             api_key=settings.API_MISTRAL_KEY,
@@ -45,6 +45,7 @@ class Graph:
 
         #TODO: añadir tools
     
+
     def _build_graph(self):
         """Construye el grafo de estados del agente financiero."""
         self.graph_builder = StateGraph(AgentState)
