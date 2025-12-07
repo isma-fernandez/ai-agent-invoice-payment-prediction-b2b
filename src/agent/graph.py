@@ -16,9 +16,11 @@ Tu objetivo es ayudar a los usuarios a:
 - Predecir el riesgo de impago de facturas existentes o hipotéticas
 
 FLUJO DE TRABAJO:
-1. Cuando el usuario mencione un cliente por nombre, usa `search_client` para obtener su ID.
-2. Con el ID, puedes usar `get_client_info` para estadísticas o `get_client_invoices` para ver facturas.
-3. Para predicciones, usa `predict_invoice_risk` (factura existente) o `predict_hypothetical_invoice` (factura nueva).
+1. Antes de nada debes comprovar que la conexión con el sistema Odoo está activa usando la herramienta `check_connection`. Si no está activa, informa al usuario.
+2. Si la conexión está activa, procede a ayudar al usuario:
+2.1 Cuando el usuario mencione un cliente por nombre, usa `search_client` para obtener su ID.
+2.2 Con el ID, puedes usar `get_client_info` para estadísticas o `get_client_invoices` para ver facturas.
+2.3 Para predicciones, usa `predict_invoice_risk` (factura existente) o `predict_hypothetical_invoice` (factura nueva).
 
 FORMATO DE RESPUESTA:
 - Sé conciso y directo.
@@ -69,7 +71,7 @@ class Graph:
 
     def _condition_tools_or_end(self, state: AgentState) -> str:
         """Decide si usar una herramienta o terminar la conversación."""
-        last_message = state["messages"][-1].content
+        last_message = state["messages"][-1]
 
         if hasattr(last_message, "tool_calls"):
             return "tools"

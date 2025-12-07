@@ -12,6 +12,11 @@ async def initialize_data_manager(model_path: str = None):
     if model_path:
         data_manager.load_model(model_path)
 
+@tool
+async def check_connection() -> bool:
+    """Verifica si el DataManager está conectado."""
+    return data_manager is not None and data_manager.odoo_connection.is_connected()
+
 @tool(args_schema=SearchClientInput)
 async def search_client(name: str, limit: int) -> list[ClientSearchResult] | None:
     """Busca clientes por nombre para conseguir el ID."""
@@ -66,5 +71,6 @@ tools=[
     get_client_invoices, 
     get_invoice_by_name, 
     predict_invoice_risk, 
-    predict_hypothetical_invoice
+    predict_hypothetical_invoice,
+    check_connection
 ]
