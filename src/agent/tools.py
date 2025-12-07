@@ -2,7 +2,15 @@ from langchain_core.tools import tool
 from src.data.manager import DataManager
 from src.data.models import *
 
-data_manager = DataManager()
+data_manager: DataManager = None
+
+async def initialize_data_manager(model_path: str = None):
+    """Inicializa el DataManager. Llamar antes de usar las tools."""
+    global data_manager
+    data_manager = DataManager()
+    await data_manager.connect()
+    if model_path:
+        data_manager.load_model(model_path)
 
 @tool(args_schema=SearchClientInput)
 async def search_client(name: str, limit: int) -> list[ClientSearchResult] | None:
