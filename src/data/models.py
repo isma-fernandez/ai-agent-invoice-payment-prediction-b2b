@@ -66,7 +66,7 @@ class PredictionResult(BaseModel):
 
 class SearchClientInput(BaseModel):
     """Input para buscar clientes por nombre."""
-    query: str = Field(description="Nombre o parte del nombre del cliente a buscar")
+    name: str = Field(description="Nombre o parte del nombre del cliente a buscar")
     limit: int = Field(default=5, description="Máximo de resultados")
 
 

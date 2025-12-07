@@ -106,18 +106,18 @@ class DataManager:
 
 
     # NOTA: Se utiliza para encontrar el ID de un cliente a partir de su nombre
-    async def search_clients(self, query: str, limit: int = 5) -> List[ClientSearchResult]:
+    async def search_clients(self, name: str, limit: int = 5) -> List[ClientSearchResult]:
         """
         Busca clientes por nombre.
         
         Args:
-            query: Nombre de la empresa a buscar.
+            name: Nombre de la empresa a buscar.
             limit: Máximo de resultados.
             
         Returns:
             Lista de ClientSearchResult con los clientes encontrados.
         """
-        raw_data = await self._data_retriever.search_client_by_name(query, limit)
+        raw_data = await self._data_retriever.search_client_by_name(name, limit)
         if not raw_data:
             return []
         results = [ClientSearchResult(id=record['id'], name=record['name']) for record in raw_data]
@@ -307,15 +307,20 @@ class DataManager:
         raw_data = await self._data_retriever.search_invoice_by_name(invoice_name)
         if not raw_data:
             return None
+        partner_id = raw_data['partner_id']
+        if isinstance(partner_id, (list, tuple)):
+            partner_id = partner_id[0]
+        invoice_id = raw_data['id']
+        df = await self._get_client_invoices_df(partner_id)
         
-        df = pd.DataFrame([raw_data])
-        clean_data, _ = self._cleaner.clean_raw_data(df)
+        if df.empty:
+            return None
+        invoice_df = df[df['id'] == invoice_id]
         
-        if clean_data is None or clean_data.empty:
+        if invoice_df.empty:
             return None
         
-        row = clean_data.iloc[0]
-        
+        row = invoice_df.iloc[0]
         days_overdue = None
         if row['payment_state'] == 'not_paid' and pd.notna(row['invoice_date_due']):
             cutoff = pd.Timestamp(self.cutoff)
