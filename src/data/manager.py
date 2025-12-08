@@ -39,8 +39,8 @@ class DataManager:
         self.cutoff = cutoff_date or pd.Timestamp.now().strftime('%Y-%m-%d')
 
         # Conexión a Odoo
-        self._odoo_connection: Optional[OdooConnection] = None
-        self._data_retriever: Optional[DataRetriever] = None
+        self.odoo_connection: Optional[OdooConnection] = None
+        self.data_retriever: Optional[DataRetriever] = None
         # Limpieza y procesamiento de datos
         self._cleaner: DataCleaner = DataCleaner()
         self._feature_engineering: FeatureEngineering = FeatureEngineering(cutoff_date=cutoff_date)
@@ -53,9 +53,9 @@ class DataManager:
     async def connect(self) -> None:
         """Establece la conexión con Odoo e inicializa el DataRetriever.
         """
-        self._odoo_connection = OdooConnection()
-        await self._odoo_connection.connect()
-        self._data_retriever = DataRetriever(odoo_connection=self._odoo_connection)
+        self.odoo_connection = OdooConnection()
+        await self.odoo_connection.connect()
+        self.data_retriever = DataRetriever(odoo_connection=self.odoo_connection)
 
 
     def load_model(self, model_path: str) -> None:
@@ -75,7 +75,7 @@ class DataManager:
         """Obtiene todas las facturas de un cliente y calcula las características
         derivadas."""
 
-        raw_data = await self._data_retriever.get_invoices_by_partner(partner_id) 
+        raw_data = await self.data_retriever.get_invoices_by_partner(partner_id) 
         if not raw_data:
             return pd.DataFrame()
         
@@ -92,7 +92,7 @@ class DataManager:
     async def _get_invoice_df(self, invoice_id: int) -> Optional[pd.DataFrame]:
         """
         Obtiene una factura específica."""
-        raw_data = await self._data_retriever.get_invoice_by_id(invoice_id)  
+        raw_data = await self.data_retriever.get_invoice_by_id(invoice_id)  
         if not raw_data:
             return None
         
@@ -117,7 +117,7 @@ class DataManager:
         Returns:
             Lista de ClientSearchResult con los clientes encontrados.
         """
-        raw_data = await self._data_retriever.search_client_by_name(name, limit)
+        raw_data = await self.data_retriever.search_client_by_name(name, limit)
         if not raw_data:
             return []
         results = [ClientSearchResult(id=record['id'], name=record['name']) for record in raw_data]
@@ -158,7 +158,7 @@ class DataManager:
         Returns:
             DataFrame con todos los partners y sus campos.
         """
-        raw_data = await self._data_retriever.get_all_customer_partners()
+        raw_data = await self.data_retriever.get_all_customer_partners()
         
         return pd.DataFrame(raw_data) if raw_data else pd.DataFrame()
     
@@ -304,7 +304,7 @@ class DataManager:
         Returns:
             InvoiceSummary si se encuentra, None en caso contrario.
         """
-        raw_data = await self._data_retriever.search_invoice_by_name(invoice_name)
+        raw_data = await self.data_retriever.search_invoice_by_name(invoice_name)
         if not raw_data:
             return None
         partner_id = raw_data['partner_id']

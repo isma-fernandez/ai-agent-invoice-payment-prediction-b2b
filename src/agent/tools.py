@@ -15,7 +15,7 @@ async def initialize_data_manager(model_path: str = None):
 @tool
 async def check_connection() -> bool:
     """Verifica si el DataManager está conectado."""
-    return data_manager is not None and data_manager.odoo_connection.is_connected()
+    return data_manager is not None and await data_manager.odoo_connection.is_connected()
 
 @tool(args_schema=SearchClientInput)
 async def search_client(name: str, limit: int) -> list[ClientSearchResult] | None:
