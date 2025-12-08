@@ -2,8 +2,9 @@ from .odoo_connector import OdooConnection
 from .config import INVOICE_FIELDS, PARTNER_FIELDS, BATCH_SIZE
 
 class DataRetriever:
-    def __init__(self, odoo_connection: OdooConnection):
+    def __init__(self, odoo_connection: OdooConnection, cutoff_date: str = None):
         self.odoo_connection = odoo_connection
+        self.cutoff_date = cutoff_date
     
     """  MÉTODOS PARA RECUPERAR TODOS LOS REGISTROS DE UN MODELO """
     async def get_all_outbound_invoices(self):
@@ -15,7 +16,11 @@ class DataRetriever:
         all_records = []
         offset = 0
         while True:
-            records = await self.odoo_connection.search_read('account.move', [('move_type', '=', 'out_invoice')], INVOICE_FIELDS, BATCH_SIZE, offset)
+            records = await self.odoo_connection.search_read('account.move', 
+                                                             [
+                                                                 ('move_type', '=', 'out_invoice'),
+                                                                 ('invoice_date_due', '<=', self.cutoff_date)
+                                                             ], INVOICE_FIELDS, BATCH_SIZE, offset)
             if not records:
                 break
             all_records.extend(records)
@@ -58,7 +63,7 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         
-        domain = [('name', 'ilike', invoice_name), ('move_type', '=', 'out_invoice')]
+        domain = [('name', 'ilike', invoice_name), ('move_type', '=', 'out_invoice'), ('invoice_date_due', '<=', self.cutoff_date)]
         records = await self.odoo_connection.search_read(
             model='account.move', 
             domain=domain, 
@@ -75,8 +80,9 @@ class DataRetriever:
         """
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
-        domain = [('company_id', '=', company_id),
-                  ('move_type', '=', 'out_invoice')]
+        domain = [('company_id', '=', int(company_id)),
+                  ('move_type', '=', 'out_invoice'),
+                  ('invoice_date_due', '<=', self.cutoff_date)]
         all_records = []
         offset = 0
         while True:
@@ -116,7 +122,8 @@ class DataRetriever:
         """
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
-        domain = [('id', '=', invoice_id)]
+        domain = [('id', '=', int(invoice_id)),
+                  ('invoice_date_due', '<=', self.cutoff_date)]
         invoice = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS)
         if invoice:
             return invoice[0]
@@ -128,7 +135,7 @@ class DataRetriever:
         """
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
-        domain = [('id', '=', partner_id)]
+        domain = [('id', '=', int(partner_id))]
         partner = await self.odoo_connection.search_read('res.partner', domain, PARTNER_FIELDS)
         if partner:
             return partner[0]
@@ -143,7 +150,7 @@ class DataRetriever:
         """
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
-        domain = [('partner_id', '=', partner_id)]
+        domain = [('partner_id', '=', int(partner_id)), ('move_type', '=', 'out_invoice'), ('invoice_date_due', '<=', self.cutoff_date)]
         records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
         return records
     
@@ -154,6 +161,7 @@ class DataRetriever:
         if self.odoo_connection.client is None:
             raise Exception("El cliente no está conectado a Odoo.")
         domain = [('invoice_date', '>=', start_date), ('invoice_date', '<=', end_date),
-                  ('company_id', '=', company_id)]
+                  ('company_id', '=', int(company_id)), ('move_type', '=', 'out_invoice'),
+                  ('invoice_date_due', '<=', self.cutoff_date)]
         records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
         return records

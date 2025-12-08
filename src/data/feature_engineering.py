@@ -20,8 +20,8 @@ class FeatureEngineering:
     
     # Características del modelo
     MODEL_FEATURES = [
-        'amount_total_eur', 'term_rounded', 'currency_name', 'company_name', 
-        'partner_name', 'due_last_three_days_month', 'due_date_second_half_month',
+        'amount_total_eur', 'term', 'currency_name', 'company_name', 
+        'due_last_three_days_month', 'due_date_second_half_month',
         'num_prior_invoices', 'num_late_prior_invoices', 'ratio_late_prior_invoices',
         'avg_delay_prior_late_invoices', 'avg_delay_prior_all', 'avg_payment_term_prior_invoices',
         'avg_invoiced_prior', 'total_invoice_amount_prior', 'total_invoice_amount_late_prior', 
@@ -86,7 +86,7 @@ class FeatureEngineering:
         if len(paid_df) > 0:
             paid_df = self._add_payment_features(paid_df)
         
-        # Añadir term_rounded a las impagadas (sin payment_overdue_days)
+        # Añadir term a las impagadas (sin payment_overdue_days)
         if len(unpaid_df) > 0:
             unpaid_df = self._add_payment_features(unpaid_df, calculate_overdue=False)
         
@@ -221,7 +221,7 @@ class FeatureEngineering:
         # Crear DataFrame de una fila con la nueva factura
         df = pd.DataFrame([new_invoice])
         
-        # Añadir term_rounded (sin payment_overdue_days porque no tiene sentido)
+        # Añadir term(sin payment_overdue_days porque no tiene sentido)
         df = self._add_payment_features(df, calculate_overdue=False)
         
         # Añadir features de fecha
@@ -278,7 +278,7 @@ class FeatureEngineering:
 
     def _add_payment_features(self, df: pd.DataFrame, 
                               calculate_overdue: bool = True) -> pd.DataFrame:
-        """Añade características de pago: payment_overdue_days, term_rounded.
+        """Añade características de pago: payment_overdue_days, term.
         """
         df = df.copy()
         
@@ -289,7 +289,7 @@ class FeatureEngineering:
             ).dt.days
         
         df['payment_term_in_days'] = (df['invoice_date_due'] - df['invoice_date']).dt.days
-        df['term_rounded'] = df['payment_term_in_days'].apply(self._map_days_to_term)
+        df['term'] = df['payment_term_in_days'].apply(self._map_days_to_term)
         df = df.drop(columns=['payment_term_in_days'])
         
         return df
@@ -326,7 +326,7 @@ class FeatureEngineering:
         df.loc[idx, 'num_prior_invoices'] = len(prior_invoices)
         df.loc[idx, 'total_invoice_amount_prior'] = prior_invoices['amount_total_eur'].sum()
         df.loc[idx, 'avg_delay_prior_all'] = prior_invoices['payment_overdue_days'].mean()
-        df.loc[idx, 'avg_payment_term_prior_invoices'] = prior_invoices['term_rounded'].mean()
+        df.loc[idx, 'avg_payment_term_prior_invoices'] = prior_invoices['term'].mean()
         
         if len(late_prior) > 0:
             df.loc[idx, 'num_late_prior_invoices'] = len(late_prior)

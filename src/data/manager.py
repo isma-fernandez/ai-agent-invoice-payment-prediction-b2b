@@ -22,6 +22,8 @@ class DataManager:
 
     """
     
+    LABEL_MAPPING = {0: 'Grave', 1: 'Leve', 2: 'Puntual'}
+
     def __init__(self, cutoff_date: str = None):
         """Inicializa el DataManager.
         Args:
@@ -55,7 +57,7 @@ class DataManager:
         """
         self.odoo_connection = OdooConnection()
         await self.odoo_connection.connect()
-        self.data_retriever = DataRetriever(odoo_connection=self.odoo_connection)
+        self.data_retriever = DataRetriever(odoo_connection=self.odoo_connection, cutoff_date=self.cutoff)
 
 
     def load_model(self, model_path: str) -> None:
@@ -198,7 +200,8 @@ class DataManager:
             client_invoices_df=history
         )
         
-        prediction = self._model.predict(X)[0]
+        prediction_idx = int(self._model.predict(X)[0])
+        prediction = self.LABEL_MAPPING[prediction_idx]
         probabilities = self._model.predict_proba(X)[0]
         classes = self._model.classes_
         prob_dict = {
@@ -275,7 +278,8 @@ class DataManager:
             client_invoices_df=history
         )
         
-        prediction = self._model.predict(X)[0]
+        prediction_idx = int(self._model.predict(X)[0])
+        prediction = self.LABEL_MAPPING[prediction_idx]
         probabilities = self._model.predict_proba(X)[0]   
         classes = self._model.classes_
         prob_dict = {

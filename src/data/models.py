@@ -79,6 +79,7 @@ class GetClientInvoicesInfoInput(BaseModel):
     partner_id: int = Field(description="ID del cliente en el sistema")
     limit: int = Field(default=5, description="Máximo de facturas a devolver")
     only_unpaid: bool = Field(default=False, description="Solo facturas pendientes de pago")
+    paid_only: bool = Field(default=False, description="Solo facturas pagadas")
 
 class PredictInvoiceInput(BaseModel):
     """Input para predecir riesgo de una factura existente."""
