@@ -20,7 +20,7 @@ class OdooConnection:
         return self.client
 
     async def is_connected(self) -> bool:
-        return self.client is not None and self.client.is_connected()
+        return self.client is not None and self.client.is_connected
 
     async def search_read(self, model, domain, fields, limit=0, offset=0):
         return await self.client.search_read(model, domain, fields, limit, offset)

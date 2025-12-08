@@ -67,6 +67,8 @@ class DataCleaner:
             6. Limpia y procesa fechas de pago, convierte a datetime y elimina filas sin fecha.
             7. Elimina facturas de marketplace.
         """
+        if invoices_df is None:
+            return pd.DataFrame()
         df = invoices_df.copy()
 
         # Convertir datos faltantes de Odoo a NaN
@@ -114,6 +116,8 @@ class DataCleaner:
             3. Separa campos ``*_id`` en dos columnas (id y name).
             4. Rellena invoices_ids y columnas derivadas.
         """
+        if partners_df is None:
+            return pd.DataFrame()
         df = partners_df.copy()
 
         # Convertir datos faltantes de Odoo a NaN

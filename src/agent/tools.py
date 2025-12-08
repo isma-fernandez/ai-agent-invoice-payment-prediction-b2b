@@ -15,11 +15,16 @@ async def initialize_data_manager(model_path: str = None):
 @tool
 async def check_connection() -> bool:
     """Verifica si el DataManager está conectado."""
-    return data_manager is not None and await data_manager.odoo_connection.is_connected()
+    if data_manager is not None and await data_manager.odoo_connection.is_connected():
+        print("Conexión exitosa al Odoo.")
+        return True
+    print("No hay conexión al Odoo.")
+    return False
 
 @tool(args_schema=SearchClientInput)
-async def search_client(name: str, limit: int) -> list[ClientSearchResult] | None:
-    """Busca clientes por nombre para conseguir el ID."""
+async def search_client(name: str, limit: int = 5) -> list[ClientSearchResult] | None:
+    """Busca clientes por nombre para conseguir el ID.
+    También necesita el limita de resultados a devolver."""
     return await data_manager.search_clients(name=name, limit=limit)
 
 @tool(args_schema=GetClientInfoInput)
@@ -32,7 +37,7 @@ async def get_client_info(partner_id: int) -> ClientInfo | None:
     return await data_manager.get_client_info(partner_id=partner_id)
 
 @tool(args_schema=GetClientInvoicesInfoInput)
-async def get_client_invoices(partner_id: int, limit: int, only_unpaid: bool) -> list[InvoiceSummary] | None:
+async def get_client_invoices(partner_id: int, limit: int = 5, only_unpaid: bool = False, paid_only: bool = False) -> list[InvoiceSummary] | None:
     """Recupera un resumen de las facturas de un cliente a partir de su ID.
     Se puede especificar un límite de facturas a devolver y si se quieren
     solo las facturas pendientes de pago.
@@ -40,7 +45,7 @@ async def get_client_invoices(partner_id: int, limit: int, only_unpaid: bool) ->
     fecha de vencimiento, estado de pago, fecha de pago,
     si se pagó tarde, días de retraso y días de vencimiento.
     """
-    return await data_manager.get_client_invoices(partner_id=partner_id, limit=limit, only_unpaid=only_unpaid)
+    return await data_manager.get_client_invoices(partner_id=partner_id, limit=limit, only_unpaid=only_unpaid, paid_only=paid_only)
 
 @tool(args_schema=GetInvoiceByName)
 async def get_invoice_by_name(invoice_name: str) -> InvoiceSummary | None:
@@ -54,7 +59,7 @@ async def predict_invoice_risk(invoice_id: int) -> PredictionResult | None:
     """
     return await data_manager.predict(invoice_id=invoice_id)
 @tool(args_schema=PredictHypotheticalInput)
-async def predict_hypothetical_invoice(partner_id: int, amount_eur: float, payment_term_days: int) -> PredictionResult | None:
+async def predict_hypothetical_invoice(partner_id: int, amount_eur: float, payment_term_days: int = 30) -> PredictionResult | None:
     """Predice el riesgo de impago de una factura hipotética.
     Proporciona el ID del cliente, monto en EUR y fecha de vencimiento.
     Devuelve la categoría de riesgo y las probabilidades asociadas.

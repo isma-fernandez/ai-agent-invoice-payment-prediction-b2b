@@ -341,7 +341,8 @@ class DataManager:
         )
 
     async def get_client_invoices(self, partner_id: int, limit: int = 20, 
-                                   only_unpaid: bool = False) -> List[InvoiceSummary]:
+                                   only_unpaid: bool = False,
+                                   paid_only: bool = False) -> List[InvoiceSummary]:
         """Obtiene las facturas de un cliente para el agente.
         
         Args:
@@ -359,7 +360,8 @@ class DataManager:
         
         if only_unpaid:
             df = df[df['payment_state'] == 'not_paid']
-        
+        if paid_only:
+            df = df[df['payment_state'] == 'paid']
         df = df.head(limit)
         
         cutoff = pd.Timestamp(self.cutoff)
