@@ -1,5 +1,6 @@
 from config.settings import settings
-from mcp_odoo.odoo.client import OdooClient
+import odoorpc
+
 
 class OdooConnection:
     def __init__(self):
@@ -8,22 +9,19 @@ class OdooConnection:
         self.username = settings.ODOO_USERNAME
         self.password = settings.ODOO_PASSWORD
         self.client = None
+        self._connected = False
 
-    async def connect(self):
-        self.client = OdooClient(
-            url=self.url,
-            database=self.db,
-            username=self.username,
-            password=self.password
-        )
-        await self.client.connect()
+    def connect(self):
+        self.client = odoorpc.ODOO(self.url)
+        self.client.login(self.db, self.username, self.password)
+        self._connected = True
         return self.client
 
-    async def is_connected(self) -> bool:
-        return self.client is not None and self.client.is_connected
+    def is_connected(self) -> bool:
+        return self._connected and self.client is not None
 
-    async def search_read(self, model, domain, fields, limit=0, offset=0):
-        return await self.client.search_read(model, domain, fields, limit, offset)
-    
-    async def execute_kw(self, model, method, args, kwargs=None):
-        return await self.client.execute_kw(model, method, args, kwargs)
+    def search_read(self, model, domain, fields, limit=0, offset=0):
+        return self.client.env[model].search_read(domain, fields, limit=limit, offset=offset)
+
+    def execute_kw(self, model, method, args, kwargs=None):
+        return self.client.execute_kw(model, method, args, kwargs or {})
