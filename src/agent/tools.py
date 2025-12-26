@@ -9,8 +9,9 @@ async def initialize_data_manager(model_path: str = None):
     global data_manager
     data_manager = DataManager(cutoff_date="2025-01-01")
     await data_manager.connect()
-    if model_path:
-        data_manager.load_model(model_path)
+    #TODO: reactivar
+    #if model_path:
+        #data_manager.load_model(model_path)
 
 @tool
 async def check_connection() -> bool:

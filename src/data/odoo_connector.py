@@ -14,7 +14,10 @@ class OdooConnection:
 
     async def connect(self):
         def _connect():
-            client = odoorpc.ODOO(self.url)
+            host = self.url.replace("https://", "").split(":")[0].split("/")[0]
+            port = 443
+            protocol = "jsonrpc+ssl"
+            client = odoorpc.ODOO(host, protocol=protocol, port=port)
             client.login(self.db, self.username, self.password)
             return client
         self.client = await asyncio.to_thread(_connect)
