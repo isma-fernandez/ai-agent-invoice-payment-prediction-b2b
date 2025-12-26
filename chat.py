@@ -7,10 +7,12 @@ st.title("Asistente de facturación")
 
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())
+
 if "agent" not in st.session_state:
     with st.spinner("Iniciando el agente financiero..."):
         st.session_state.agent = FinancialAgent()
         st.success("Agente conectado correctamente.")
+
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -40,14 +42,14 @@ async def run_stream(agent, prompt, thread_id, status_placeholder, message_place
 
         if kind == "on_tool_start":
             tool_name = event.get("name", "herramienta")
-            status_placeholder.info(f"🔧 Usando: `{tool_name}`...")
+            status_placeholder.info(f"Usando: {tool_name}...")
 
         elif kind == "on_tool_end":
             tool_name = event.get("name", "herramienta")
-            status_placeholder.success(f"✓ `{tool_name}` completado")
+            status_placeholder.success(f"{tool_name} completado")
 
         elif kind == "on_chat_model_start":
-            status_placeholder.info("🤔 Pensando...")
+            status_placeholder.info("Pensando...")
 
         elif kind == "on_chat_model_stream":
             content = event.get("data", {}).get("chunk", {})
@@ -83,7 +85,6 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
                 message_placeholder.markdown(final_response)
                 st.session_state.messages.append({"role": "assistant", "content": final_response})
             else:
-                # Fallback si el streaming no devolvió contenido
                 full_state = asyncio.run(st.session_state.agent.process_request(
                     prompt, thread_id=st.session_state.thread_id
                 ))
