@@ -44,7 +44,8 @@ async def get_client_info(partner_id: int) -> ClientInfo | None:
     """Recupera información y estadísticas de un cliente a partir de su ID.
     Incluyendo número de facturas, monto total facturado, nombre, país
     número de facturas pagadas e impagadas, monto total pendiente, 
-    ratio de pago a tiempo y promedio de días de retraso.
+    ratio de pago a tiempo, promedio de días de retraso y obtiene
+    también el riesgo del cliente.
 
     Args:
         partner_id (int): ID del cliente en el sistema.

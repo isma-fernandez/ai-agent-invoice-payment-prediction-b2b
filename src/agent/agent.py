@@ -11,4 +11,8 @@ class FinancialAgent:
 
     async def process_request(self, request: str, thread_id: str) -> str:
         responses = await self.graph.run(request=request, thread_id=thread_id)
-        return responses      
+        return responses
+
+    async def stream_request(self, request: str, thread_id: str):
+        async for event in self.graph.stream(request=request, thread_id=thread_id):
+            yield event

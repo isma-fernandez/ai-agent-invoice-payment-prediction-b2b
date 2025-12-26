@@ -1,13 +1,9 @@
 import asyncio
 import uuid
 import streamlit as st
-import time
 from src.agent.agent import FinancialAgent
 
-
 st.title("Asistente de facturación")
-
-# Inicializar el agente financiero y el estado del chat
 
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())
@@ -18,58 +14,83 @@ if "agent" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
-            "role": "assistant", 
-            "content": """
-                ¡Hola! Soy tu asistente financiero. Puedo ayudarte con las siguientes tareas
+            "role": "assistant",
+            "content": """¡Hola! Soy tu asistente financiero. Puedo ayudarte con las siguientes tareas
 
 1. **Buscar información sobre clientes:** Obtener detalles de un cliente por su nombre.
 2. **Consultar estadísticas de pago:** Ver historial y métricas clave.
 3. **Ver facturas:** Revisar facturas pagadas, pendientes o vencidas.
 4. **Predecir riesgo de impago:** Evaluar facturas existentes o hipotéticas.
 
-¿Qué te gustaría hacer hoy?
-            """.strip()  # .strip() elimina el primer y último salto de línea vacíos
+¿Qué te gustaría hacer hoy?"""
         }
     ]
-# Mostrar el historial del chat
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-print(st.session_state.messages)   
+
+async def run_stream(agent, prompt, thread_id, status_placeholder, message_placeholder):
+    """Ejecuta el streaming y actualiza los placeholders."""
+    response_text = ""
+
+    async for event in agent.stream_request(prompt, thread_id):
+        kind = event.get("event")
+
+        if kind == "on_tool_start":
+            tool_name = event.get("name", "herramienta")
+            status_placeholder.info(f"🔧 Usando: `{tool_name}`...")
+
+        elif kind == "on_tool_end":
+            tool_name = event.get("name", "herramienta")
+            status_placeholder.success(f"✓ `{tool_name}` completado")
+
+        elif kind == "on_chat_model_start":
+            status_placeholder.info("🤔 Pensando...")
+
+        elif kind == "on_chat_model_stream":
+            content = event.get("data", {}).get("chunk", {})
+            if hasattr(content, "content") and content.content:
+                response_text += content.content
+                message_placeholder.markdown(response_text + "▌")
+
+        elif kind == "on_chat_model_end":
+            status_placeholder.empty()
+
+    return response_text
 
 
 if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
-    # Agregar el mensaje del usuario al historial
     st.session_state.messages.append({"role": "user", "content": prompt})
-    # Mostrar el mensaje del usuario en la interfaz
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Procesar la entrada del usuario y obtener la respuesta del agente
     with st.chat_message("assistant"):
+        status_placeholder = st.empty()
         message_placeholder = st.empty()
-        
-        try:
-            full_response_state = asyncio.run(st.session_state.agent.process_request(
-                prompt, thread_id=st.session_state.thread_id
-                ))
-            
-            # Extraer el contenido del mensaje de la respuesta del agente
-            if "messages" in full_response_state and full_response_state["messages"]:
-                agent_response_content = full_response_state["messages"][-1].content
-            else:
-                agent_response_content = "El agente no devolvió ningún mensaje."
 
-            # TODO: No es ideal, langchain debería soportar streaming nativamente
-            display_text = ""
-            for char in agent_response_content:
-                display_text += char
-                message_placeholder.markdown(display_text + "▌")
-                time.sleep(0.005) 
-            
-            message_placeholder.markdown(agent_response_content)
-            st.session_state.messages.append({"role": "assistant", "content": agent_response_content})
+        try:
+            final_response = asyncio.run(run_stream(
+                st.session_state.agent,
+                prompt,
+                st.session_state.thread_id,
+                status_placeholder,
+                message_placeholder
+            ))
+
+            if final_response:
+                message_placeholder.markdown(final_response)
+                st.session_state.messages.append({"role": "assistant", "content": final_response})
+            else:
+                # Fallback si el streaming no devolvió contenido
+                full_state = asyncio.run(st.session_state.agent.process_request(
+                    prompt, thread_id=st.session_state.thread_id
+                ))
+                if "messages" in full_state and full_state["messages"]:
+                    final_response = full_state["messages"][-1].content
+                    message_placeholder.markdown(final_response)
+                    st.session_state.messages.append({"role": "assistant", "content": final_response})
 
         except Exception as e:
-            st.error(f"Ocurrió un error al procesar tu solicitud: {e}")
+            st.error(f"Ocurrió un error: {e}")
