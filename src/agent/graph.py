@@ -70,6 +70,7 @@ class Graph:
         self.graph_builder.add_edge("tools", "chatbot")
         return self.graph_builder.compile(checkpointer=self.memory)
 
+
     def _condition_tools_or_end(self, state: AgentState) -> str:
         """Decide si usar una herramienta o terminar la conversación."""
         last_message = state["messages"][-1]
@@ -77,6 +78,7 @@ class Graph:
         if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools"
         return END
+
 
     def _chatbot(self, state: AgentState):
         messages = state["messages"]
@@ -87,6 +89,18 @@ class Graph:
         
         result = self.llm.invoke(messages)
         return {"messages": [result]}
+
+
+    async def stream(self, request: str, thread_id: str):
+        config = {"configurable": {"thread_id": thread_id}}
+        initial_state: AgentState = {
+            "messages": [{"role": "human", "content": request}],
+            "client_id": None,
+            "risk_category": None,
+            "explanation": None,
+        }
+        async for event in self.graph.astream_events(initial_state, config=config):
+            yield event
 
 
     async def run(self, request: str, thread_id: str) -> AgentState:
