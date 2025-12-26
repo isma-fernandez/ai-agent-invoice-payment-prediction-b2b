@@ -1,12 +1,16 @@
 from .odoo_connector import OdooConnection
 from .config import INVOICE_FIELDS, PARTNER_FIELDS, BATCH_SIZE
+import pandas as pd
 
 class DataRetriever:
     def __init__(self, odoo_connection: OdooConnection, cutoff_date: str = None):
         self.odoo_connection = odoo_connection
         self.cutoff_date = cutoff_date
-    
+
+
     """  MÉTODOS PARA RECUPERAR TODOS LOS REGISTROS DE UN MODELO """
+
+
     async def get_all_outbound_invoices(self):
         """
         Recupera todas las facturas de salida (outbound) de todas las empresas.
@@ -28,6 +32,7 @@ class DataRetriever:
                 print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
             offset += BATCH_SIZE
         return all_records
+
 
     async def search_client_by_name(self, name: str, limit: int = 5):
         """
@@ -51,6 +56,7 @@ class DataRetriever:
         )
         return records
 
+
     async def search_invoice_by_name(self, invoice_name: str):
         """
         Busca una factura por su nombre.
@@ -73,7 +79,8 @@ class DataRetriever:
         if records:
             return records[0]
         return None
-    
+
+
     async def get_all_outbound_invoices_by_company(self, company_id: int):
         """
         Recupera todas las facturas de salida para una empresa dada.
@@ -95,6 +102,7 @@ class DataRetriever:
             offset += BATCH_SIZE
         return all_records
 
+
     async def get_all_customer_partners(self):
         """
         Recupera todos los partners (clientes/proveedores).
@@ -112,9 +120,50 @@ class DataRetriever:
                 print(f"Recuperadas {len(records)} facturas, total: {len(all_records)}")
             offset += BATCH_SIZE
         return all_records
-    
+
+
+    async def get_all_overdue_invoices(self, min_days_overdue: int = 1, limit: int = 50):
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+
+        cutoff = pd.Timestamp(self.cutoff_date)
+        max_due_date = (cutoff - pd.Timedelta(days=min_days_overdue)).strftime('%Y-%m-%d')
+
+        domain = [
+            ('move_type', '=', 'out_invoice'),
+            ('payment_state', 'in', ['not_paid', 'partial']),
+            ('invoice_date_due', '<=', max_due_date)
+        ]
+
+        return await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, limit=limit)
+
 
     """ MÉTODOS PARA RECUPERAR REGISTROS ESPECÍFICOS POR ID """
+
+
+    async def get_partners_with_overdue_invoices(self) -> list[int]:
+        """Obtiene IDs de partners con facturas vencidas."""
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+
+        domain = [
+            ('move_type', '=', 'out_invoice'),
+            ('payment_state', 'in', ['not_paid', 'partial']),
+            ('invoice_date_due', '<', self.cutoff_date)
+        ]
+
+        records = await self.odoo_connection.search_read('account.move', domain, ['partner_id'], limit=0)
+
+        partner_ids = set()
+        for r in records:
+            pid = r['partner_id']
+            if isinstance(pid, (list, tuple)):
+                partner_ids.add(pid[0])
+            elif pid:
+                partner_ids.add(pid)
+
+        return list(partner_ids)
+
 
     async def get_invoice_by_id(self, invoice_id: int):
         """
@@ -129,6 +178,7 @@ class DataRetriever:
             return invoice[0]
         return None
 
+
     async def get_partner_by_id(self, partner_id: int):
         """
         Recupera un partner por su ID.
@@ -141,8 +191,9 @@ class DataRetriever:
             return partner[0]
         return None
     
-    
+
     """ MÉTODOS ADICIONALES SEGÚN NECESIDAD """
+
 
     async def get_invoices_by_partner(self, partner_id: int):
         """
@@ -153,7 +204,8 @@ class DataRetriever:
         domain = [('partner_id', '=', int(partner_id)), ('move_type', '=', 'out_invoice'), ('invoice_date_due', '<=', self.cutoff_date)]
         records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
         return records
-    
+
+
     async def get_invoices_by_date(self, start_date: str, end_date: str, company_id: int):
         """
         Recupera todas las facturas de una empresa dentro de un rango de fechas.

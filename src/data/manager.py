@@ -144,12 +144,16 @@ class DataManager:
         
         stats = self._feature_engineering.calculate_client_stats(df)
         
-        return ClientInfo(
+        client_info = ClientInfo(
             id=partner_id,
             name=df['partner_name'].iloc[0],
             country_name=df.get('country_name', pd.Series([None])).iloc[0],
             **stats
         )
+
+        client_info.risk_score = self._calculate_risk_score(client_info)
+
+        return client_info
 
     # NOTA: Realmente solo sirve para entrenar nuevos modelos
     async def get_all_partners(self) -> pd.DataFrame:
@@ -341,7 +345,8 @@ class DataManager:
             payment_date=row['payment_dates'].date() if pd.notna(row.get('payment_dates')) else None,
             paid_late=bool(row['paid_late']) if pd.notna(row.get('paid_late')) else None,
             delay_days=int(row['payment_overdue_days']) if pd.notna(row.get('payment_overdue_days')) else None,
-            days_overdue=days_overdue
+            days_overdue=days_overdue,
+            partner_id=partner_id,
         )
 
     async def get_client_invoices(self, partner_id: int, limit: int = 20, 
@@ -386,7 +391,103 @@ class DataManager:
                 payment_date=row['payment_dates'].date() if pd.notna(row.get('payment_dates')) else None,
                 paid_late=bool(row['paid_late']) if pd.notna(row.get('paid_late')) else None,
                 delay_days=int(row['payment_overdue_days']) if pd.notna(row.get('payment_overdue_days')) else None,
-                days_overdue=days_overdue
+                days_overdue=days_overdue,
+                partner_id=partner_id,
             ))
         
         return invoices
+
+    def _calculate_risk_score(self, client: ClientInfo) -> float:
+        """Calcula una puntuación de riesgo 0-100 para un cliente."""
+        score = 0.0
+
+        # Factor 1: Ratio de puntualidad (40%)
+        score += (1 - client.on_time_ratio) * 40
+
+        # Factor 2: Promedio de días de retraso (30%)
+        delay_score = min(client.avg_delay_days / 60, 1.0) * 30
+        score += delay_score
+
+        # Factor 3: Facturas vencidas actuales (30%)
+        if client.total_invoices > 0:
+            overdue_ratio = client.overdue_invoices / client.total_invoices
+            score += overdue_ratio * 30
+
+        return round(min(score, 100), 2)
+
+
+    async def get_overdue_invoices(self, limit: int = 10, min_days_overdue: int = 1) -> List[InvoiceSummary]:
+        """Obtiene facturas vencidas de todos los clientes."""
+        raw_invoices = await self.data_retriever.get_all_overdue_invoices(
+            min_days_overdue=min_days_overdue,
+            limit=limit * 2
+        )
+        if not raw_invoices:
+            return []
+
+        cutoff = pd.Timestamp(self.cutoff)
+        results = []
+
+        for inv in raw_invoices:
+            partner_id = inv['partner_id']
+            partner_name = None
+
+            if isinstance(partner_id, (list, tuple)):
+                partner_name = partner_id[1]
+                partner_id = partner_id[0]
+
+            due_date = pd.Timestamp(inv['invoice_date_due'])
+            invoice_date = pd.Timestamp(inv['invoice_date'])
+            days_overdue = (cutoff - due_date).days
+            if days_overdue < min_days_overdue:
+                continue
+
+            results.append(InvoiceSummary(
+                id=inv['id'],
+                name=inv['name'],
+                amount_eur=round(float(inv.get('amount_residual', inv['amount_total'])), 2),
+                invoice_date=invoice_date.date(),
+                due_date=due_date.date(),
+                payment_state=PaymentState.NOT_PAID,
+                days_overdue=days_overdue,
+                partner_id=partner_id,
+                partner_name=partner_name
+            ))
+
+        results.sort(key=lambda x: x.days_overdue, reverse=True)
+        return results[:limit]
+
+
+    async def get_high_risk_clients(self, limit: int = 10) -> List[ClientInfo]:
+        """Obtiene los clientes con mayor riesgo, ordenados por risk_score."""
+        partner_ids = await self.data_retriever.get_partners_with_overdue_invoices()
+        if not partner_ids:
+            return []
+        results = []
+
+        for partner_id in partner_ids:
+            client_info = await self.get_client_info(partner_id)
+            if client_info is None:
+                continue
+            results.append(client_info)
+
+        # Ordenar por riesgo
+        results.sort(key=lambda x: x.risk_score, reverse=True)
+        return results[:limit]
+
+
+    async def compare_clients(self, partner_ids: List[int]) -> List[ClientInfo]:
+        """Compara clientes añadiendo risk_score a cada uno."""
+        if len(partner_ids) < 2:
+            return []
+
+        results = []
+        for partner_id in partner_ids:
+            client_info = await self.get_client_info(partner_id)
+            if client_info is None:
+                continue
+            results.append(client_info)
+
+        # Ordenar por riesgo
+        results.sort(key=lambda x: x.risk_score)
+        return results

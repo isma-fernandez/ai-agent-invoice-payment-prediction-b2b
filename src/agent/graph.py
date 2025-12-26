@@ -87,7 +87,8 @@ class Graph:
         
         result = self.llm.invoke(messages)
         return {"messages": [result]}
-    
+
+
     async def run(self, request: str, thread_id: str) -> AgentState:
         config = {"configurable": {"thread_id": thread_id}}
         initial_state: AgentState = {

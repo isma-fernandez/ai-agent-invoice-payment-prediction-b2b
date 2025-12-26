@@ -34,7 +34,8 @@ class ClientInfo(BaseModel):
     overdue_invoices: int
     total_outstanding_eur: float
     on_time_ratio: float 
-    avg_delay_days: float  
+    avg_delay_days: float
+    risk_score: Optional[float] = None
 
 
 class InvoiceSummary(BaseModel):
@@ -48,7 +49,9 @@ class InvoiceSummary(BaseModel):
     payment_date: Optional[date] = None
     paid_late: Optional[bool] = None
     delay_days: Optional[int] = None 
-    days_overdue: Optional[int] = None  
+    days_overdue: Optional[int] = None
+    partner_id: Optional[int] = None
+    partner_name: Optional[str] = None
 
 
 class PredictionResult(BaseModel):
@@ -94,3 +97,12 @@ class PredictHypotheticalInput(BaseModel):
     partner_id: int = Field(description="ID del cliente")
     amount_eur: float = Field(description="Importe de la factura en EUR", gt=0)
     payment_term_days: int = Field(default=30, description="Días de plazo de pago")
+
+class GetOverdueInvoicesInput(BaseModel):
+    """Input para obtener facturas vencidas."""
+    limit: int = Field(default=10, description="Máximo de facturas a devolver")
+    min_days_overdue: int = Field(default=1, description="Mínimo de días de vencimiento")
+
+class CompareClientsInput(BaseModel):
+    """Input para comparar clientes."""
+    partner_ids: list[int] = Field(description="Lista de IDs de clientes a comparar (mínimo 2)")
