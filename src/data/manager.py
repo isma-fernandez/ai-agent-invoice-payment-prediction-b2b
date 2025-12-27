@@ -1,11 +1,8 @@
 import pandas as pd
-import numpy as np
-from typing import Optional, Tuple, Dict, List, Any
-from pathlib import Path
-from datetime import date
+from typing import Optional, Dict, List, Any
 import joblib
 
-from .odoo_connector import OdooConnection
+from utils.odoo_connector import OdooConnection
 from .retriever import DataRetriever
 from .cleaner import DataCleaner
 from .feature_engineering import FeatureEngineering

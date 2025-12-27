@@ -148,6 +148,14 @@ class GetInvoiceByName(BaseModel):
     """Input para obtener una factura por su nombre."""
     invoice_name: str = Field(description="Nombre de la factura")
 
+class ChartType(str, Enum):
+    BAR = "bar"
+    HORIZONTAL_BAR = "horizontal_bar"
+    LINE = "line"
+    PIE = "pie"
+    DONUT = "donut"
+
+
 class PredictHypotheticalInput(BaseModel):
     """Input para predecir riesgo de una factura hipotética."""
     partner_id: int = Field(description="ID del cliente")
@@ -187,15 +195,6 @@ class GetDeterioratingClientsInput(BaseModel):
     """Input para clientes que empeoran."""
     limit: int = Field(default=10, description="Máximo de clientes a devolver")
     min_invoices: int = Field(default=5, description="Mínimo de facturas históricas para considerar")
-
-
-class ChartType(str, Enum):
-    BAR = "bar"
-    HORIZONTAL_BAR = "horizontal_bar"
-    LINE = "line"
-    PIE = "pie"
-    DONUT = "donut"
-
 
 class GenerateChartInput(BaseModel):
     """Input para generar un gráfico."""

@@ -1,4 +1,4 @@
-from .odoo_connector import OdooConnection
+from utils.odoo_connector import OdooConnection
 from .config import INVOICE_FIELDS, PARTNER_FIELDS, BATCH_SIZE
 import pandas as pd
 
