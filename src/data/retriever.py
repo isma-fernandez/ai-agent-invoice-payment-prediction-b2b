@@ -103,6 +103,20 @@ class DataRetriever:
         return all_records
 
 
+    async def get_all_unpaid_invoices(self, limit: int = 0) -> list:
+        """Recupera todas las facturas pendientes de pago."""
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+
+        domain = [
+            ('move_type', '=', 'out_invoice'),
+            ('payment_state', 'in', ['not_paid', 'partial']),
+            ('invoice_date_due', '<=', self.cutoff_date)
+        ]
+
+        return await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, limit=limit)
+
+
     async def get_all_customer_partners(self):
         """
         Recupera todos los partners (clientes/proveedores).
@@ -217,3 +231,38 @@ class DataRetriever:
                   ('invoice_date_due', '<=', self.cutoff_date)]
         records = await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, 0)
         return records
+
+
+    async def get_invoices_due_between(self, start_date: str, end_date: str, only_unpaid: bool = True) -> list:
+        """Recupera facturas con vencimiento entre dos fechas."""
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+
+        domain = [
+            ('move_type', '=', 'out_invoice'),
+            ('invoice_date_due', '>=', start_date),
+            ('invoice_date_due', '<=', end_date),
+        ]
+        if only_unpaid:
+            domain.append(('payment_state', 'in', ['not_paid', 'partial']))
+
+        return await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, limit=0)
+
+
+    async def get_invoices_by_period(self, start_date: str, end_date: str,
+                                     partner_id: int = None, only_unpaid: bool = False) -> list:
+        """Recupera facturas emitidas en un período."""
+        if self.odoo_connection.client is None:
+            raise Exception("El cliente no está conectado a Odoo.")
+
+        domain = [
+            ('move_type', '=', 'out_invoice'),
+            ('invoice_date', '>=', start_date),
+            ('invoice_date', '<=', end_date),
+        ]
+        if partner_id:
+            domain.append(('partner_id', '=', partner_id))
+        if only_unpaid:
+            domain.append(('payment_state', 'in', ['not_paid', 'partial']))
+
+        return await self.odoo_connection.search_read('account.move', domain, INVOICE_FIELDS, limit=0)

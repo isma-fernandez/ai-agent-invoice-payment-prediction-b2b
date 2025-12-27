@@ -173,17 +173,128 @@ async def compare_clients(partner_ids: list[int]) -> list[ClientInfo]:
     """
     return await data_manager.compare_clients(partner_ids=partner_ids)
 
+@tool(args_schema=GetUpcomingDueInvoicesInput)
+async def get_upcoming_due_invoices(days_ahead: int = 7, limit: int = 20) -> list[InvoiceSummary]:
+    """Obtiene facturas pendientes que vencen en los próximos días.
+    Útil para gestión preventiva de cobros (contactar clientes ANTES del vencimiento).
+    Devuelve facturas ordenadas por fecha de vencimiento más próxima.
+    El campo days_overdue será NEGATIVO indicando días hasta el vencimiento.
+    Ej: days_overdue = -3 significa "vence en 3 días".
+
+    Args:
+        days_ahead (int): Días hacia adelante para buscar (ej: 7 = próxima semana).
+        limit (int): Máximo de facturas a devolver.
+
+    Returns:
+        list[InvoiceSummary]: Lista de facturas próximas a vencer.
+    """
+    return await data_manager.get_upcoming_due_invoices(days_ahead=days_ahead, limit=limit)
 
 
-tools=[
-    search_client, 
-    get_client_info, 
-    get_client_invoices, 
-    get_invoice_by_name, 
-    predict_invoice_risk, 
+@tool
+async def get_aging_report() -> AgingReport:
+    """Genera un informe de antigüedad de deuda (aging report).
+    Distribuye las facturas vencidas en buckets: 0-30, 31-60, 61-90, >90 días.
+    Incluye importe total, número de facturas y porcentaje por cada bucket.
+    Informe estándar en gestión de cobros para entender la composición de la deuda.
+
+    Returns:
+        AgingReport: Informe con total_overdue_eur, total_overdue_count y buckets.
+    """
+    return await data_manager.get_aging_report()
+
+
+@tool
+async def get_portfolio_summary() -> PortfolioSummary:
+    """Genera un resumen ejecutivo de la cartera de cobros.
+    Incluye: total pendiente (vencido + no vencido), total vencido,
+    DSO (Days Sales Outstanding), número de facturas por estado,
+    y promedio de días de retraso histórico.
+    Útil para tener una visión global del estado de cobros.
+
+    Returns:
+        PortfolioSummary: Resumen con métricas clave de cartera.
+    """
+    return await data_manager.get_portfolio_summary()
+
+
+@tool(args_schema=GetClientTrendInput)
+async def get_client_trend(partner_id: int, recent_months: int = 6) -> ClientTrend | None:
+    """Analiza la tendencia de comportamiento de pago de un cliente.
+    Compara el período reciente (últimos N meses) con el período anterior.
+    Indica si el cliente está "mejorando", "empeorando" o "estable".
+    Útil para detectar cambios en el comportamiento antes de que sea tarde.
+    Requiere usar search_client primero para obtener el partner_id.
+
+    Args:
+        partner_id (int): ID del cliente a analizar.
+        recent_months (int): Meses a considerar como período reciente.
+
+    Returns:
+        ClientTrend | None: Análisis con métricas de ambos períodos y tendencia.
+    """
+    return await data_manager.get_client_trend(partner_id=partner_id, recent_months=recent_months)
+
+
+@tool(args_schema=GetDeterioratingClientsInput)
+async def get_deteriorating_clients(limit: int = 10, min_invoices: int = 5) -> list[DeterioratingClient]:
+    """Identifica clientes cuyo comportamiento de pago está EMPEORANDO.
+    Compara métricas recientes vs históricas para detectar deterioro.
+    Solo incluye clientes con historial suficiente (min_invoices).
+    Ordenados por mayor deterioro primero (cambio más negativo en on_time_ratio).
+    Útil para intervención proactiva con clientes problemáticos.
+
+    Args:
+        limit (int): Máximo de clientes a devolver.
+        min_invoices (int): Mínimo de facturas históricas requeridas para análisis.
+
+    Returns:
+        list[DeterioratingClient]: Clientes en deterioro con métricas comparativas.
+    """
+    return await data_manager.get_deteriorating_clients(limit=limit, min_invoices=min_invoices)
+
+
+@tool(args_schema=GetInvoicesByPeriodInput)
+async def get_invoices_by_period(start_date: str, end_date: str,
+                                  partner_id: int = None, only_unpaid: bool = False) -> list[InvoiceSummary]:
+    """Obtiene facturas emitidas en un período específico.
+    Puede filtrarse opcionalmente por cliente y/o solo pendientes.
+    Útil para análisis temporal: "facturas del Q3", "facturas de enero",
+    "qué le facturamos a X el año pasado".
+    Las fechas deben estar en formato YYYY-MM-DD.
+
+    Args:
+        start_date (str): Fecha inicio en formato YYYY-MM-DD.
+        end_date (str): Fecha fin en formato YYYY-MM-DD.
+        partner_id (int, optional): ID del cliente para filtrar (None = todos).
+        only_unpaid (bool): Si True, solo devuelve facturas pendientes de pago.
+
+    Returns:
+        list[InvoiceSummary]: Facturas del período ordenadas por fecha (recientes primero).
+    """
+    return await data_manager.get_invoices_by_period(
+        start_date=start_date,
+        end_date=end_date,
+        partner_id=partner_id,
+        only_unpaid=only_unpaid
+    )
+
+
+tools = [
+    search_client,
+    get_client_info,
+    get_client_invoices,
+    get_invoice_by_name,
+    predict_invoice_risk,
     predict_hypothetical_invoice,
     check_connection,
     get_overdue_invoices,
     get_high_risk_clients,
-    compare_clients
+    compare_clients,
+    get_upcoming_due_invoices,
+    get_aging_report,
+    get_portfolio_summary,
+    get_client_trend,
+    get_deteriorating_clients,
+    get_invoices_by_period,
 ]

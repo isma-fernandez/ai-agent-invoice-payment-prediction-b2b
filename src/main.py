@@ -3,6 +3,20 @@ from src.data.cleaner import DataCleaner
 from src.data.feature_engineering import FeatureEngineering
 from src.agent.agent import FinancialAgent
 
+"""
+Base de datos caida...
+Cosas por probar:
+  Nuevas tools:
+    - "¿Qué facturas vencen esta semana?" get_upcoming_due_invoices
+    - "Dame el aging report" get_aging_report
+    - "¿Cuál es el estado de la cartera?" get_portfolio_summary
+    - "¿Cómo ha evolucionado el cliente X?" get_client_trend
+    - "¿Qué clientes están empeorando?" get_deteriorating_clients
+    - "Facturas del último trimestre" get_invoices_by_period
+
+"""
+
+
 def test_data_processing():
     # Cargar datos
     invoices_raw = pd.read_pickle('data/outbound_invoices.pkl')

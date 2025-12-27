@@ -34,7 +34,6 @@ for message in st.session_state.messages:
 
 
 async def run_stream(agent, prompt, thread_id, status_placeholder, message_placeholder):
-    """Ejecuta el streaming y actualiza los placeholders."""
     response_text = ""
 
     async for event in agent.stream_request(prompt, thread_id):

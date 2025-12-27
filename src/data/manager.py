@@ -11,7 +11,9 @@ from .cleaner import DataCleaner
 from .feature_engineering import FeatureEngineering
 from .models import (
     ClientSearchResult, ClientInfo, InvoiceSummary, 
-    PredictionResult, RiskCategory, PaymentState
+    PredictionResult, RiskCategory, PaymentState,
+    AgingReport, PortfolioSummary, ClientTrend,
+    DeterioratingClient, AgingBucket
 )
 
 class DataManager:
@@ -490,4 +492,299 @@ class DataManager:
 
         # Ordenar por riesgo
         results.sort(key=lambda x: x.risk_score)
+        return results
+
+
+    async def get_upcoming_due_invoices(self, days_ahead: int = 7, limit: int = 20) -> List[InvoiceSummary]:
+        """Obtiene facturas que vencen en los próximos X días."""
+        cutoff = pd.Timestamp(self.cutoff)
+        end_date = (cutoff + pd.Timedelta(days=days_ahead)).strftime('%Y-%m-%d')
+
+        raw_invoices = await self.data_retriever.get_invoices_due_between(
+            start_date=self.cutoff,
+            end_date=end_date,
+            only_unpaid=True
+        )
+
+        if not raw_invoices:
+            return []
+
+        results = []
+        for inv in raw_invoices:
+            partner_id = inv['partner_id']
+            partner_name = None
+            if isinstance(partner_id, (list, tuple)):
+                partner_name = partner_id[1]
+                partner_id = partner_id[0]
+
+            due_date = pd.Timestamp(inv['invoice_date_due'])
+            days_until_due = (due_date - cutoff).days
+
+            results.append(InvoiceSummary(
+                id=inv['id'],
+                name=inv['name'],
+                amount_eur=round(float(inv.get('amount_residual', inv['amount_total'])), 2),
+                invoice_date=pd.Timestamp(inv['invoice_date']).date(),
+                due_date=due_date.date(),
+                payment_state=PaymentState.NOT_PAID,
+                days_overdue=-days_until_due,  # Negativo = días hasta vencimiento
+                partner_id=partner_id,
+                partner_name=partner_name
+            ))
+
+        results.sort(key=lambda x: x.due_date)
+        return results[:limit]
+
+
+    async def get_aging_report(self) -> AgingReport:
+        """Genera informe de antigüedad de deuda (aging report)."""
+        raw_invoices = await self.data_retriever.get_all_overdue_invoices(min_days_overdue=1, limit=0)
+
+        if not raw_invoices:
+            return AgingReport(
+                total_overdue_eur=0,
+                total_overdue_count=0,
+                buckets=[],
+                generated_at=pd.Timestamp(self.cutoff).date()
+            )
+
+        cutoff = pd.Timestamp(self.cutoff)
+
+        buckets_data = {
+            '0-30': {'count': 0, 'amount': 0.0},
+            '31-60': {'count': 0, 'amount': 0.0},
+            '61-90': {'count': 0, 'amount': 0.0},
+            '>90': {'count': 0, 'amount': 0.0},
+        }
+
+        total_amount = 0.0
+
+        for inv in raw_invoices:
+            due_date = pd.Timestamp(inv['invoice_date_due'])
+            days_overdue = (cutoff - due_date).days
+            amount = float(inv.get('amount_residual', inv['amount_total']))
+
+            if days_overdue <= 0:
+                continue
+
+            total_amount += amount
+
+            if days_overdue <= 30:
+                buckets_data['0-30']['count'] += 1
+                buckets_data['0-30']['amount'] += amount
+            elif days_overdue <= 60:
+                buckets_data['31-60']['count'] += 1
+                buckets_data['31-60']['amount'] += amount
+            elif days_overdue <= 90:
+                buckets_data['61-90']['count'] += 1
+                buckets_data['61-90']['amount'] += amount
+            else:
+                buckets_data['>90']['count'] += 1
+                buckets_data['>90']['amount'] += amount
+
+        buckets = []
+        for label, data in buckets_data.items():
+            pct = (data['amount'] / total_amount * 100) if total_amount > 0 else 0
+            buckets.append(AgingBucket(
+                range_label=label,
+                invoice_count=data['count'],
+                total_amount_eur=round(data['amount'], 2),
+                percentage=round(pct, 2)
+            ))
+
+        return AgingReport(
+            total_overdue_eur=round(total_amount, 2),
+            total_overdue_count=sum(b.invoice_count for b in buckets),
+            buckets=buckets,
+            generated_at=pd.Timestamp(self.cutoff).date()
+        )
+
+
+    async def get_portfolio_summary(self) -> PortfolioSummary:
+        """Genera resumen de cartera."""
+        raw_invoices = await self.data_retriever.get_all_unpaid_invoices(limit=0)
+
+        cutoff = pd.Timestamp(self.cutoff)
+
+        total_outstanding = 0.0
+        total_overdue = 0.0
+        total_not_due = 0.0
+        overdue_count = 0
+        not_due_count = 0
+        total_delay_days = 0.0
+        paid_count = 0
+
+        all_invoices = await self.data_retriever.get_all_outbound_invoices()
+        df = pd.DataFrame(all_invoices)
+        if not df.empty:
+            clean_df, _ = self._cleaner.clean_raw_data(df)
+            if not clean_df.empty:
+                paid_df = clean_df[clean_df['payment_state'] == 'paid']
+                if len(paid_df) > 0:
+                    paid_df = self._feature_engineering._add_payment_features(paid_df)
+                    total_delay_days = paid_df['payment_overdue_days'].sum()
+                    paid_count = len(paid_df)
+
+        for inv in raw_invoices:
+            amount = float(inv.get('amount_residual', inv['amount_total']))
+            due_date = pd.Timestamp(inv['invoice_date_due'])
+            total_outstanding += amount
+            if due_date < cutoff:
+                total_overdue += amount
+                overdue_count += 1
+            else:
+                total_not_due += amount
+                not_due_count += 1
+
+        avg_delay = (total_delay_days / paid_count) if paid_count > 0 else 0
+        dso = 30 + avg_delay
+
+        return PortfolioSummary(
+            total_outstanding_eur=round(total_outstanding, 2),
+            total_overdue_eur=round(total_overdue, 2),
+            total_not_due_eur=round(total_not_due, 2),
+            overdue_count=overdue_count,
+            not_due_count=not_due_count,
+            dso=round(dso, 1),
+            average_delay_days=round(avg_delay, 1),
+            generated_at=pd.Timestamp(self.cutoff).date()
+        )
+
+
+    async def get_client_trend(self, partner_id: int, recent_months: int = 6) -> Optional[ClientTrend]:
+        """Analiza la tendencia de comportamiento de pago de un cliente."""
+        df = await self._get_client_invoices_df(partner_id)
+        if df.empty:
+            return None
+
+        paid_df = df[df['payment_state'] == 'paid'].copy()
+        if len(paid_df) < 4:  # Mínimo para calcular tendencia
+            return None
+
+        cutoff = pd.Timestamp(self.cutoff)
+        recent_start = cutoff - pd.DateOffset(months=recent_months)
+        recent = paid_df[paid_df['invoice_date'] >= recent_start]
+        previous = paid_df[paid_df['invoice_date'] < recent_start]
+
+        def calc_stats(subset):
+            if len(subset) == 0:
+                return 0, 0.0, 0.0
+            on_time = (~subset['paid_late']).sum() / len(subset)
+            avg_delay = subset['payment_overdue_days'].mean()
+            return len(subset), round(on_time, 4), round(avg_delay, 2)
+
+        recent_count, recent_otr, recent_delay = calc_stats(recent)
+        prev_count, prev_otr, prev_delay = calc_stats(previous)
+        change_otr = recent_otr - prev_otr
+        change_delay = recent_delay - prev_delay
+
+        if prev_count == 0:
+            trend = "sin_historial"
+        elif change_otr > 0.05 or change_delay < -5:
+            trend = "mejorando"
+        elif change_otr < -0.05 or change_delay > 5:
+            trend = "empeorando"
+        else:
+            trend = "estable"
+
+        return ClientTrend(
+            partner_id=partner_id,
+            partner_name=df['partner_name'].iloc[0],
+            recent_invoices=recent_count,
+            recent_on_time_ratio=recent_otr,
+            recent_avg_delay=recent_delay,
+            previous_invoices=prev_count,
+            previous_on_time_ratio=prev_otr,
+            previous_avg_delay=prev_delay,
+            trend=trend,
+            change_on_time_ratio=round(change_otr, 4),
+            change_avg_delay=round(change_delay, 2)
+        )
+
+
+    async def get_deteriorating_clients(self, limit: int = 10, min_invoices: int = 5) -> List[DeterioratingClient]:
+        """Identifica clientes cuyo comportamiento de pago está empeorando."""
+        partner_ids = await self.data_retriever.get_partners_with_overdue_invoices()
+
+        # También incluir partners con historial aunque no tengan vencidas
+        all_invoices = await self.data_retriever.get_all_outbound_invoices()
+        df = pd.DataFrame(all_invoices)
+        if not df.empty:
+            clean_df, _ = self._cleaner.clean_raw_data(df)
+            all_partner_ids = clean_df['partner_id'].unique().tolist()
+            partner_ids = list(set(partner_ids + all_partner_ids))
+        results = []
+        for pid in partner_ids:
+            trend = await self.get_client_trend(pid, recent_months=6)
+            if trend is None:
+                continue
+            if trend.previous_invoices < min_invoices:
+                continue
+            if trend.trend != "empeorando":
+                continue
+            client_info = await self.get_client_info(pid)
+            if client_info is None:
+                continue
+            results.append(DeterioratingClient(
+                partner_id=pid,
+                partner_name=trend.partner_name,
+                previous_on_time_ratio=trend.previous_on_time_ratio,
+                recent_on_time_ratio=trend.recent_on_time_ratio,
+                change_on_time_ratio=trend.change_on_time_ratio,
+                previous_avg_delay=trend.previous_avg_delay,
+                recent_avg_delay=trend.recent_avg_delay,
+                change_avg_delay=trend.change_avg_delay,
+                current_overdue_count=client_info.overdue_invoices,
+                current_overdue_eur=client_info.total_outstanding_eur
+            ))
+
+        results.sort(key=lambda x: x.change_on_time_ratio)
+        return results[:limit]
+
+
+    async def get_invoices_by_period(self, start_date: str, end_date: str,
+                                     partner_id: int = None, only_unpaid: bool = False) -> List[InvoiceSummary]:
+        """Obtiene facturas emitidas en un período específico."""
+        raw_invoices = await self.data_retriever.get_invoices_by_period(
+            start_date=start_date,
+            end_date=end_date,
+            partner_id=partner_id,
+            only_unpaid=only_unpaid
+        )
+
+        if not raw_invoices:
+            return []
+
+        cutoff = pd.Timestamp(self.cutoff)
+        results = []
+
+        for inv in raw_invoices:
+            pid = inv['partner_id']
+            partner_name = None
+            if isinstance(pid, (list, tuple)):
+                partner_name = pid[1]
+                pid = pid[0]
+
+            due_date = pd.Timestamp(inv['invoice_date_due'])
+            invoice_date = pd.Timestamp(inv['invoice_date'])
+
+            days_overdue = None
+            payment_state = inv['payment_state']
+            if payment_state in ['not_paid', 'partial'] and due_date < cutoff:
+                days_overdue = (cutoff - due_date).days
+
+            results.append(InvoiceSummary(
+                id=inv['id'],
+                name=inv['name'],
+                amount_eur=round(float(inv.get('amount_residual', inv['amount_total'])), 2),
+                invoice_date=invoice_date.date(),
+                due_date=due_date.date(),
+                payment_state=PaymentState(payment_state) if payment_state in ['paid',
+                                                                               'not_paid'] else PaymentState.NOT_PAID,
+                days_overdue=days_overdue,
+                partner_id=pid,
+                partner_name=partner_name
+            ))
+
+        results.sort(key=lambda x: x.invoice_date, reverse=True)
         return results
