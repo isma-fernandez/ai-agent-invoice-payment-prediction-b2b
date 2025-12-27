@@ -187,3 +187,19 @@ class GetDeterioratingClientsInput(BaseModel):
     """Input para clientes que empeoran."""
     limit: int = Field(default=10, description="Máximo de clientes a devolver")
     min_invoices: int = Field(default=5, description="Mínimo de facturas históricas para considerar")
+
+
+class ChartType(str, Enum):
+    BAR = "bar"
+    HORIZONTAL_BAR = "horizontal_bar"
+    LINE = "line"
+    PIE = "pie"
+    DONUT = "donut"
+
+
+class GenerateChartInput(BaseModel):
+    """Input para generar un gráfico."""
+    chart_type: ChartType = Field(description="Tipo de gráfico")
+    title: str = Field(description="Título del gráfico")
+    data: dict = Field(description="Datos para el gráfico: {labels: [...], values: [...], series_name: str}")
+    show_values: bool = Field(default=True, description="Mostrar valores en el gráfico")
