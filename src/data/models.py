@@ -66,12 +66,13 @@ class PredictionResult(BaseModel):
     prediction: RiskCategory
     probabilities: Dict[str, float]
 
+
 class AgingBucket(BaseModel):
     """Bucket del aging report."""
     range_label: str  # "0-30", "31-60", "61-90", ">90"
     invoice_count: int
     total_amount_eur: float
-    percentage: float  # % del total
+    percentage: float
 
 
 class AgingReport(BaseModel):
@@ -133,6 +134,7 @@ class GetClientInfoInput(BaseModel):
     """Input para obtener información de un cliente."""
     partner_id: int = Field(description="ID del cliente en el sistema")
 
+
 class GetClientInvoicesInfoInput(BaseModel):
     """Input para obtener información de facturas de un cliente."""
     partner_id: int = Field(description="ID del cliente en el sistema")
@@ -140,13 +142,16 @@ class GetClientInvoicesInfoInput(BaseModel):
     only_unpaid: bool = Field(default=False, description="Solo facturas pendientes de pago")
     paid_only: bool = Field(default=False, description="Solo facturas pagadas")
 
+
 class PredictInvoiceInput(BaseModel):
     """Input para predecir riesgo de una factura existente."""
     invoice_id: int = Field(description="ID de la factura")
 
+
 class GetInvoiceByName(BaseModel):
     """Input para obtener una factura por su nombre."""
     invoice_name: str = Field(description="Nombre de la factura")
+
 
 class ChartType(str, Enum):
     BAR = "bar"
@@ -162,14 +167,17 @@ class PredictHypotheticalInput(BaseModel):
     amount_eur: float = Field(description="Importe de la factura en EUR", gt=0)
     payment_term_days: int = Field(default=30, description="Días de plazo de pago")
 
+
 class GetOverdueInvoicesInput(BaseModel):
     """Input para obtener facturas vencidas."""
     limit: int = Field(default=10, description="Máximo de facturas a devolver")
     min_days_overdue: int = Field(default=1, description="Mínimo de días de vencimiento")
 
+
 class CompareClientsInput(BaseModel):
     """Input para comparar clientes."""
     partner_ids: list[int] = Field(description="Lista de IDs de clientes a comparar (mínimo 2)")
+
 
 class GetUpcomingDueInvoicesInput(BaseModel):
     """Input para facturas próximas a vencer."""
@@ -195,6 +203,7 @@ class GetDeterioratingClientsInput(BaseModel):
     """Input para clientes que empeoran."""
     limit: int = Field(default=10, description="Máximo de clientes a devolver")
     min_invoices: int = Field(default=5, description="Mínimo de facturas históricas para considerar")
+
 
 class GenerateChartInput(BaseModel):
     """Input para generar un gráfico."""

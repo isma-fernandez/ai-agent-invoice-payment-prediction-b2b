@@ -79,6 +79,7 @@ pathable==0.4.4
 pathvalidate==3.3.1
 pillow==12.0.0
 platformdirs==4.5.1
+plotly==6.5.0
 prometheus-client==0.23.1
 protobuf==6.33.2
 py-key-value-aio==0.3.0
