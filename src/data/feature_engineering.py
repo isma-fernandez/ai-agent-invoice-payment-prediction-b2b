@@ -17,7 +17,8 @@ class FeatureEngineering:
         outlier_percentile (float): Percentil utilizado para filtrar outliers (0.995).
 
     """
-    
+
+
     # Características del modelo
     MODEL_FEATURES = [
         'amount_total_eur', 'term', 'currency_name', 'company_name', 
@@ -29,7 +30,8 @@ class FeatureEngineering:
         'ratio_outstanding_invoices_late', 'total_invoice_amount_outstanding', 
         'total_invoice_amount_outstanding_late', 'ratio_invoice_amount_outstanding_late'
     ]
-    
+
+
     # Características derivadas
     HISTORICAL_FEATURES = [
         'avg_invoiced_prior', 'num_prior_invoices', 'num_late_prior_invoices', 
@@ -198,6 +200,7 @@ class FeatureEngineering:
         y = paid_df['payment_overdue_category'].copy()
         
         return X, y
+
 
     def process_invoice_for_prediction(self, new_invoice: pd.Series,
                                        client_invoices_df: pd.DataFrame) -> pd.DataFrame:
@@ -420,6 +423,7 @@ class FeatureEngineering:
             'on_time_ratio': on_time_ratio,
             'avg_delay_days': avg_delay_days,
         }
+
 
     def _is_last_three_days(self, date) -> bool:
         """Determina si la fecha está en los últimos 3 días del mes.

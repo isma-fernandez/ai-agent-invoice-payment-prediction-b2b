@@ -13,7 +13,8 @@ Cosas por probar:
     - "¿Cómo ha evolucionado el cliente X?" get_client_trend
     - "¿Qué clientes están empeorando?" get_deteriorating_clients
     - "Facturas del último trimestre" get_invoices_by_period
-
+    - Funcionamiento de los gráficos, ver instrucciones en el archivo de tools de cuando
+      los usa el LLM.
 """
 
 
@@ -52,13 +53,15 @@ def test_data_processing():
     print(f"Agent dataset shape: {agent_dataset.shape}")
     print(f"Training info: {X.info()}")
     print(f"Agent info: {agent_dataset.info()}")
-    
+
+
 def test_agent():
     agent = FinancialAgent()
     user_input = input("Introduce el mensaje: ")
     response = agent.process_request(user_input)
     print("\nRESPUESTA DEL AGENTE:")
     print(response)
+
 
 def main():
     test_agent()

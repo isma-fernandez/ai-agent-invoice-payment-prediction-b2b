@@ -1,7 +1,9 @@
 import asyncio
+import re
 import uuid
 import streamlit as st
 from src.agent.agent import FinancialAgent
+from src.utils.chart_generator import chart_generator
 
 st.title("Asistente de facturación")
 
@@ -81,7 +83,18 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
             ))
 
             if final_response:
-                message_placeholder.markdown(final_response)
+                # Sacar charts antes de poner la respuesta en markdown
+                chart_matches = re.findall(r'CHART:([a-f0-9]+)', final_response)
+                clean_response = re.sub(r'CHART:[a-f0-9]+', '', final_response).strip()
+                message_placeholder.markdown(clean_response)
+
+                # Renderizar los gráficos
+                for chart_id in chart_matches:
+                    fig = chart_generator.get_chart(chart_id)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                        chart_generator.clear_chart(chart_id)  # Limpiar memoria
+
                 st.session_state.messages.append({"role": "assistant", "content": final_response})
             else:
                 full_state = asyncio.run(st.session_state.agent.process_request(

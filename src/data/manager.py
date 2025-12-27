@@ -301,7 +301,8 @@ class DataManager:
             prediction=RiskCategory(prediction),
             probabilities=prob_dict
         )
-    
+
+
     async def get_invoice_by_name(self, invoice_name: str) -> Optional[InvoiceSummary]:
         """Recupera una factura por su nombre.
         
@@ -347,6 +348,7 @@ class DataManager:
             days_overdue=days_overdue,
             partner_id=partner_id,
         )
+
 
     async def get_client_invoices(self, partner_id: int, limit: int = 20, 
                                    only_unpaid: bool = False,
@@ -395,6 +397,7 @@ class DataManager:
             ))
         
         return invoices
+
 
     def _calculate_risk_score(self, client: ClientInfo) -> float:
         """Calcula una puntuación de riesgo 0-100 para un cliente."""
