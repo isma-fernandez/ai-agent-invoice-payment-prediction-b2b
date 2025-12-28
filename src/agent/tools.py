@@ -1,8 +1,11 @@
 from langchain_core.tools import tool
 from src.data.manager import DataManager
 from src.data.models import *
+from src.agent.memory.store import MemoryStore
+from src.agent.memory.models import Memory, MemoryType
 
 data_manager: DataManager = None
+memory_store: MemoryStore = None
 
 
 async def initialize_data_manager(model_path: str = None):
@@ -279,6 +282,91 @@ async def get_invoices_by_period(start_date: str, end_date: str,
         only_unpaid=only_unpaid
     )
 
+#
+# ======================= MEMORY TOOLS ===============================
+#
+async def initialize_memory_store(db_path: str = "data/agent_memory.db"):
+    """Inicializa el store de memoria."""
+    global memory_store
+    memory_store = MemoryStore(db_path)
+
+
+@tool
+async def save_client_note(partner_id: int, partner_name: str, note: str) -> str:
+    """Guarda una nota permanente sobre un cliente.
+    Usar cuando el usuario pida recordar algo sobre un cliente o cuando
+    se detecte información importante (ej: "este cliente siempre paga tarde",
+    "contactar solo por email", "riesgo de impago detectado").
+
+    Args:
+        partner_id (int): ID del cliente.
+        partner_name (str): Nombre del cliente.
+        note (str): Nota a guardar sobre el cliente.
+
+    Returns:
+        str: Confirmación de que se guardó la nota.
+    """
+    memory = Memory(
+        memory_type=MemoryType.CLIENT_NOTE,
+        content=note,
+        partner_id=partner_id,
+        partner_name=partner_name
+    )
+    memory_store.save(memory)
+    return f"Nota guardada para {partner_name}: {note}"
+
+
+@tool
+async def get_client_notes(partner_id: int) -> list[Memory]:
+    """Recupera las notas guardadas sobre un cliente.
+    Usar al inicio de cualquier consulta sobre un cliente para tener contexto.
+
+    Args:
+        partner_id (int): ID del cliente.
+
+    Returns:
+        list[Memory]: Lista de notas sobre el cliente.
+    """
+    return memory_store.get_by_partner(partner_id)
+
+
+@tool
+async def save_alert(content: str, partner_id: int = None, partner_name: str = None) -> str:
+    """Guarda una alerta importante.
+    Usar para destacar situaciones que requieren atención: clientes en riesgo,
+    facturas críticas, patrones preocupantes detectados.
+
+    Args:
+        content (str): Descripción de la alerta.
+        partner_id (int, optional): ID del cliente si aplica.
+        partner_name (str, optional): Nombre del cliente si aplica.
+
+    Returns:
+        str: Confirmación de la alerta guardada.
+    """
+    memory = Memory(
+        memory_type=MemoryType.ALERT,
+        content=content,
+        partner_id=partner_id,
+        partner_name=partner_name
+    )
+    memory_store.save(memory)
+    return f"Alerta guardada: {content}"
+
+
+@tool
+async def get_active_alerts(limit: int = 10) -> list[Memory]:
+    """Recupera las alertas activas.
+    Útil para mostrar al usuario un resumen de situaciones pendientes.
+
+    Args:
+        limit (int): Máximo de alertas a devolver.
+
+    Returns:
+        list[Memory]: Lista de alertas activas.
+    """
+    return memory_store.get_by_type(MemoryType.ALERT, limit)
+
 
 tools = [
     search_client,
@@ -297,4 +385,8 @@ tools = [
     get_client_trend,
     get_deteriorating_clients,
     get_invoices_by_period,
+    save_client_note,
+    get_client_notes,
+    save_alert,
+    get_active_alerts,
 ]
