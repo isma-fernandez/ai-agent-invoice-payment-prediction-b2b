@@ -55,6 +55,7 @@ class Graph:
 
         self.memory = MemorySaver()
         self.graph = self._build_graph()
+        self.MAX_MESSAGES = 20
         
     
     def _build_graph(self):
@@ -91,8 +92,11 @@ class Graph:
 
         # Inyecto el prompt del sistema en cada llamada, necesario para
         # evitar que el prompt se pierda en llamadas sucesivas
+
+        if len(messages) > self.MAX_MESSAGES:
+            messages = messages[-self.MAX_MESSAGES:]
+
         messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
-        
         result = self.llm.invoke(messages)
         return {"messages": [result]}
 
