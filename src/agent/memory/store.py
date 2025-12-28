@@ -1,7 +1,6 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 from .models import Memory, MemoryType
 from .definitions import CREATE_TABLE_SQL
 
@@ -22,8 +21,6 @@ def _row_to_memory(row) -> Memory:
 
 class MemoryStore:
     """Almacén de memoria semántica y episódica."""
-
-
     def __init__(self, db_path: str = "data/agent_memory.db"):
         """Inicializa la memoria."""
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -54,6 +51,42 @@ class MemoryStore:
             ))
         self.conn.commit()
         return cursor.lastrowid
+
+
+    def get_by_partner(self, partner_id: int, limit: int = 10) -> list[Memory]:
+        """Obtiene memorias de un cliente específico."""
+        cursor = self.conn.execute("""
+            SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
+            FROM memories
+            WHERE partner_id = ?
+            AND (expires_at IS NULL OR expires_at > ?)
+            ORDER BY created_at DESC LIMIT ?""",
+        (partner_id, datetime.now().isoformat(), limit))
+        return [_row_to_memory(row) for row in cursor.fetchall()]
+
+
+    def get_by_type(self, memory_type: MemoryType, limit: int = 10) -> list[Memory]:
+        """Obtiene memorias por tipo."""
+        cursor = self.conn.execute("""
+            SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
+            FROM memories
+            WHERE memory_type = ?
+            AND (expires_at IS NULL OR expires_at > ?)
+            ORDER BY created_at DESC LIMIT ?""",
+            (memory_type.value, datetime.now().isoformat(), limit))
+        return [_row_to_memory(row) for row in cursor.fetchall()]
+
+
+    def get_recent(self, limit: int = 20) -> list[Memory]:
+        """Obtiene las memorias más recientes."""
+        cursor = self.conn.execute("""
+            SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
+            FROM memories
+            WHERE expires_at IS NULL
+            OR expires_at > ?
+            ORDER BY created_at DESC LIMIT ?
+        """, (datetime.now().isoformat(), limit))
+        return [_row_to_memory(row) for row in cursor.fetchall()]
 
 
     def search(self, query: str, limit: int = 10) -> list[Memory]:
