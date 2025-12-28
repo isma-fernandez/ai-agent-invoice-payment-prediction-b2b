@@ -105,9 +105,6 @@ class Graph:
         config = {"configurable": {"thread_id": thread_id}}
         initial_state: AgentState = {
             "messages": [{"role": "human", "content": request}],
-            "client_id": None,
-            "risk_category": None,
-            "explanation": None,
         }
         async for event in self.graph.astream_events(initial_state, config=config):
             yield event
@@ -117,9 +114,6 @@ class Graph:
         config = {"configurable": {"thread_id": thread_id}}
         initial_state: AgentState = {
             "messages": [{"role": "human", "content": request}],
-            "client_id": None,
-            "risk_category": None,
-            "explanation": None,
         }
         final_state = await self.graph.ainvoke(initial_state, config=config)
         return final_state
