@@ -15,6 +15,7 @@ Cosas por probar:
     - "Facturas del último trimestre" get_invoices_by_period
     - Funcionamiento de los gráficos, ver instrucciones en el archivo de tools de cuando
       los usa el LLM.
+    - Funcionamiento de LangSmith 
 """
 
 

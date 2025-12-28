@@ -1,7 +1,8 @@
 import asyncio
 from config.settings import settings
 from .graph import Graph
-from src.agent.tools import initialize_data_manager, tools
+from src.agent.tools import initialize_data_manager
+
 
 class FinancialAgent:
     def __init__(self):
