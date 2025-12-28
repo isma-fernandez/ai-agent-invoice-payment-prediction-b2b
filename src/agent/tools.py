@@ -10,12 +10,13 @@ memory_store: MemoryStore = None
 
 async def initialize_data_manager(model_path: str = None):
     """Inicializa el DataManager. Llamar antes de usar las tools."""
-    global data_manager
+    global data_manager, memory_store
     data_manager = DataManager(cutoff_date="2025-01-01")
     await data_manager.connect()
     #TODO: reactivar
     #if model_path:
         #data_manager.load_model(model_path)
+    memory_store = MemoryStore()
 
 
 @tool
