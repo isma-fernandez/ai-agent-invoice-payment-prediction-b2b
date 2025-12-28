@@ -35,6 +35,12 @@ REGLAS:
 - Usa únicamente las herramientas disponibles para obtener información.
 - Si alguna información o herramienta no está disponible, informa al usuario de manera clara.
 
+GESTIÓN DE MEMORIA:
+- Cuando consultes información de un cliente, usa primero `get_client_notes` para ver si hay notas previas.
+- Si el usuario te pide recordar algo o detectas información importante sobre un cliente, usa `save_client_note`.
+- Usa `save_alert` para situaciones críticas que requieran seguimiento.
+- Usa `get_active_alerts` cuando el usuario pregunte por pendientes o alertas.
+
 Responde en español."""
 
 class Graph:
