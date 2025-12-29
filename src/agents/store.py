@@ -34,8 +34,8 @@ class MemoryStore:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 memory_type TEXT NOT NULL,
                 content TEXT NOT NULL,
-                entity_id INTEGER,
-                entity_name TEXT,
+                partner_id INTEGER,
+                partner_name TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 expires_at TIMESTAMP
             )
