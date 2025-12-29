@@ -1,7 +1,7 @@
 from src.data.manager import DataManager
 from src.agents.store import MemoryStore
 from src.agents.shared import set_data_manager, set_memory_store
-from src.agents.orchestrator import Orchestrator
+from .graph import Orchestrator
 
 
 class FinancialAgent:
