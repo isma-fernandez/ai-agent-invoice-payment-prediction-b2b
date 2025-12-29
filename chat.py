@@ -12,7 +12,13 @@ if "thread_id" not in st.session_state:
 
 if "agent" not in st.session_state:
     with st.spinner("Iniciando el agente financiero..."):
-        st.session_state.agent = FinancialAgent()
+        agent = FinancialAgent()
+        # Inicializar conexión a Odoo y cargar modelo (TODO: Desactivado por ahora el modelo)
+        asyncio.run(agent.initialize(
+            cutoff_date="2025-01-01",
+            model_path="models/late_invoice_payment_classification.pkl"
+        ))
+        st.session_state.agent = agent
         st.success("Agente conectado correctamente.")
 
 if "messages" not in st.session_state:
@@ -93,17 +99,15 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
                     fig = chart_generator.get_chart(chart_id)
                     if fig:
                         st.plotly_chart(fig, use_container_width=True)
-                        chart_generator.clear_chart(chart_id)  # Limpiar memoria
+                        chart_generator.clear_chart(chart_id)
 
                 st.session_state.messages.append({"role": "assistant", "content": final_response})
             else:
-                full_state = asyncio.run(st.session_state.agent.process_request(
+                final_response = asyncio.run(st.session_state.agent.process_request(
                     prompt, thread_id=st.session_state.thread_id
                 ))
-                if "messages" in full_state and full_state["messages"]:
-                    final_response = full_state["messages"][-1].content
-                    message_placeholder.markdown(final_response)
-                    st.session_state.messages.append({"role": "assistant", "content": final_response})
+                message_placeholder.markdown(final_response)
+                st.session_state.messages.append({"role": "assistant", "content": final_response})
 
         except Exception as e:
             st.error(f"Ocurrió un error: {e}")
