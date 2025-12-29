@@ -123,6 +123,23 @@ class Orchestrator:
         return "".join(lines) if lines else "sin historial"
 
 
+    async def run(self, request: str, thread_id: str) -> str:
+        """Procesa una solicitud y devuelve la respuesta."""
+        config = {"configurable": {"thread_id": thread_id}}
+        initial_state = {
+            "messages": [HumanMessage(content=request)],
+            "next_agent": None
+        }
+
+        final_state = await self.graph.ainvoke(initial_state, config=config)
+
+        for msg in reversed(final_state["messages"]):
+            if isinstance(msg, AIMessage) and msg.content:
+                return msg.content
+
+        return "No se ha podido procesar tu solicitud."
+
+
     async def stream(self, request: str, thread_id: str):
         """Procesa en modo streaming."""
         config = {"configurable": {"thread_id": thread_id}}
