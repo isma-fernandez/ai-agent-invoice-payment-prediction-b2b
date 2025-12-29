@@ -150,3 +150,14 @@ async def get_invoices_by_period(start_date: str, end_date: str,
         partner_id=partner_id,
         only_unpaid=only_unpaid
     )
+
+DATA_TOOLS = [
+    check_connection,
+    search_client,
+    get_client_info,
+    get_client_invoices,
+    get_invoice_by_name,
+    get_overdue_invoices,
+    get_upcoming_due_invoices,
+    get_invoices_by_period,
+]
