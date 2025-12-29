@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_mistralai import ChatMistralAI
 from langchain_core.messages import SystemMessage
-from config.settings import settings
+from src.config.settings import settings
 from .state import AgentState
 
 

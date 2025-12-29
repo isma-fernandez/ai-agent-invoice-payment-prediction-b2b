@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, START, END
 from langchain_mistralai import ChatMistralAI
 from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.checkpoint.memory import MemorySaver
-from config.settings import settings
+from src.config.settings import settings
 
 from src.agents.state import AgentState
 from src.agents.data_agent import DataAgent
