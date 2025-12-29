@@ -1,6 +1,6 @@
 """Gestión de recursos compartidos entre sub-agentes."""
 from src.data.manager import DataManager
-from src.agent.memory.store import MemoryStore
+from src.agents.store import MemoryStore
 
 _data_manager: DataManager = None
 _memory_store: MemoryStore = None
