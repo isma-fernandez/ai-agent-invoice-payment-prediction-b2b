@@ -1,4 +1,4 @@
-from src.agents.base_agent import BaseAgent
+from src.agents import BaseAgent
 from .tools import ANALYSIS_TOOLS
 
 PROMPT = """Eres un agente de análisis de riesgo y predicciones.

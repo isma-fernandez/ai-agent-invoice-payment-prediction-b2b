@@ -1,4 +1,4 @@
-from src.agents.base_agent import BaseAgent
+from src.agents import BaseAgent
 from .tools import DATA_TOOLS
 
 PROMPT = """Eres un agente de recuperación de datos del sistema Odoo.

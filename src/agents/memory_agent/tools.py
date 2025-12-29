@@ -1,5 +1,5 @@
 from langchain_core.tools import tool
-from src.agent.memory.models import Memory, MemoryType
+from src.data.models import Memory, MemoryType
 from src.agents.shared import get_memory_store
 
 

@@ -1,4 +1,4 @@
-from src.agents.base_agent import BaseAgent
+from src.agents import BaseAgent
 from .tools import MEMORY_TOOLS
 
 PROMPT = """Eres un agente de gestión de memoria y notas.
