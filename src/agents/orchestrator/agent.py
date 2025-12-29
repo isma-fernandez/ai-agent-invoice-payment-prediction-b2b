@@ -28,6 +28,12 @@ class FinancialAgent:
         self._orchestrator = Orchestrator()
         self._initialized = True
 
+    async def process_request(self, request: str, thread_id: str) -> str:
+        """Procesa una solicitud del usuario."""
+        if not self._initialized:
+            raise RuntimeError("Agente no inicializado. Llama a initialize() primero.")
+        return await self._orchestrator.run(request, thread_id)
+
 
     async def stream_request(self, request: str, thread_id: str):
         """Procesa en modo streaming"""

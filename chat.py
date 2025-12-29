@@ -2,7 +2,7 @@ import asyncio
 import re
 import uuid
 import streamlit as st
-from src.agent.agent import FinancialAgent
+from src.agents.orchestrator import FinancialAgent
 from src.utils.chart_generator import chart_generator
 
 st.title("Asistente de facturación")
