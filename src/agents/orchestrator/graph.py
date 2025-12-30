@@ -17,10 +17,10 @@ AGENTES DISPONIBLES:
 - memory_agent: guardar notas, recordar algo, ver notas del cliente, alertas
 
 REGLAS:
-1. Usa el historial de conversación para entender referencias como "ese cliente", "su riesgo", etc.
-2. Si la tarea requiere datos que no tienes, usa data_agent primero
-3. Si ya tienes suficiente información para responder, di FINISH
-4. No repitas agentes innecesariamente
+1. Analiza el historial para ver si la solicitud del usuario YA FUE RESPONDIDA
+2. Si el Asistente ya dio una respuesta completa a lo que pidió el Usuario → responde FINISH
+3. Si necesitas datos que no tienes → usa el agente apropiado
+4. NUNCA repitas un agente si ya completó su tarea
 
 Responde SOLO con: data_agent, analysis_agent, memory_agent o FINISH"""
 
@@ -98,9 +98,16 @@ class Orchestrator:
 
     def _build_router_prompt(self, messages: list) -> str:
         history = self._build_conversation_context(messages)
+        has_response = any(
+            isinstance(msg, AIMessage) and msg.content.strip() and not getattr(msg, 'tool_calls', None)
+            for msg in messages[1:]
+        )
+        status = "El asistente YA RESPONDIÓ." if has_response else "Pendiente de respuesta."
         return f"""HISTORIAL:
     {history}
 
+    ESTADO: {status}
+    
     ¿Qué agente debe actuar ahora? (data_agent, analysis_agent, memory_agent, o FINISH)"""
 
     def _route(self, state: AgentState) -> str:
