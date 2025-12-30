@@ -134,8 +134,7 @@ class Orchestrator:
 
         for msg in reversed(final_state["messages"]):
             if isinstance(msg, AIMessage) and msg.content:
-                if not (hasattr(msg, 'tool_calls') and msg.tool_calls and not msg.content.strip()):
-                    return msg.content
+                return msg.content
 
         return "No se ha podido procesar tu solicitud."
 
