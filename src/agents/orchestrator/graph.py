@@ -86,20 +86,21 @@ class Orchestrator:
 
         return {"next_agent": next_agent}
 
-    def _build_router_prompt(self, messages: list) -> str:
-        """Construye el prompt para el router con el historial de conversación."""
+    def _build_conversation_context(self, messages: list, limit: int = 10) -> str:
+        """Extrae el contexto de conversación de los mensajes."""
         lines = []
         for msg in messages:
             if isinstance(msg, HumanMessage):
                 lines.append(f"Usuario: {msg.content}")
-            elif isinstance(msg, AIMessage) and msg.content.strip():
-                # Ignoramos las tool calls
-                if not msg.tool_calls:
-                    lines.append(f"Asistente: {msg.content}")
-        # TODO: Límite de mensajes hardcodeado
-        history = "\n".join(lines[-10:])
+            elif isinstance(msg, AIMessage) and msg.content.strip() and not msg.tool_calls:
+                lines.append(f"Asistente: {msg.content}")
+        return "\n".join(lines[-limit:])
+
+    def _build_router_prompt(self, messages: list) -> str:
+        history = self._build_conversation_context(messages)
         return f"""HISTORIAL:
     {history}
+
     ¿Qué agente debe actuar ahora? (data_agent, analysis_agent, memory_agent, o FINISH)"""
 
     def _route(self, state: AgentState) -> str:
@@ -109,17 +110,20 @@ class Orchestrator:
 
     async def _run_data_agent(self, state: AgentState) -> dict:
         """Ejecuta el DataAgent."""
-        result = await self.data_agent.run(state["messages"])
+        context = self._build_conversation_context(state["messages"])
+        result = await self.data_agent.run(content=context)
         return {"messages": result["messages"]}
 
     async def _run_analysis_agent(self, state: AgentState) -> dict:
         """Ejecuta el AnalysisAgent."""
-        result = await self.analysis_agent.run(state["messages"])
+        context = self._build_conversation_context(state["messages"])
+        result = await self.analysis_agent.run(content=context)
         return {"messages": result["messages"]}
 
     async def _run_memory_agent(self, state: AgentState) -> dict:
         """Ejecuta el MemoryAgent."""
-        result = await self.memory_agent.run(state["messages"])
+        context = self._build_conversation_context(state["messages"])
+        result = await self.memory_agent.run(content=context)
         return {"messages": result["messages"]}
 
     async def run(self, request: str, thread_id: str) -> str:
