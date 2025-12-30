@@ -19,7 +19,9 @@ class FinancialAgent:
         dm = DataManager(cutoff_date=cutoff_date)
         await dm.connect()
         if model_path:
-            dm.load_model(model_path)
+            #TODO: Desactivado temporalmente
+            #dm.load_model(model_path)
+            ...
         set_data_manager(dm)
 
         ms = MemoryStore()

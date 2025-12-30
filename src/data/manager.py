@@ -2,7 +2,7 @@ import pandas as pd
 from typing import Optional, Dict, List, Any
 import joblib
 
-from utils.odoo_connector import OdooConnection
+from src.utils.odoo_connector import OdooConnection
 from .retriever import DataRetriever
 from .cleaner import DataCleaner
 from .feature_engineering import FeatureEngineering
