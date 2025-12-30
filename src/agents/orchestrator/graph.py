@@ -119,19 +119,26 @@ class Orchestrator:
         """Ejecuta el DataAgent."""
         context = self._build_conversation_context(state["messages"])
         result = await self.data_agent.run([HumanMessage(content=context)])
-        return {"messages": result["messages"]}
+        return {"messages": self._extract_final_response(result["messages"])}
 
     async def _run_analysis_agent(self, state: AgentState) -> dict:
         """Ejecuta el AnalysisAgent."""
         context = self._build_conversation_context(state["messages"])
         result = await self.analysis_agent.run([HumanMessage(content=context)])
-        return {"messages": result["messages"]}
+        return {"messages": self._extract_final_response(result["messages"])}
 
     async def _run_memory_agent(self, state: AgentState) -> dict:
         """Ejecuta el MemoryAgent."""
         context = self._build_conversation_context(state["messages"])
         result = await self.memory_agent.run([HumanMessage(content=context)])
-        return {"messages": result["messages"]}
+        return {"messages": self._extract_final_response(result["messages"])}
+
+    def _extract_final_response(self, messages: list) -> list:
+        """Extrae solo la respuesta final de un sub-agente."""
+        for msg in reversed(messages):
+            if isinstance(msg, AIMessage) and msg.content.strip() and not msg.tool_calls:
+                return [msg]
+        return []
 
     async def run(self, request: str, thread_id: str) -> str:
         """Procesa una solicitud y devuelve la respuesta."""

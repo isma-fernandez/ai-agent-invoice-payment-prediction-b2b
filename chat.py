@@ -46,11 +46,12 @@ async def run_stream(agent, prompt, thread_id, status_placeholder, message_place
     current_tool = None
     last_complete_response = ""
 
+    router_keywords = {"data_agent", "analysis_agent", "memory_agent", "finish"}
+
     async for event in agent.stream_request(prompt, thread_id):
         kind = event.get("event")
         name = event.get("name", "")
 
-        # Ignorar eventos del router (para evitar msgs de "data_analyst", ...)
         if "router" in name.lower():
             continue
 
@@ -82,7 +83,12 @@ async def run_stream(agent, prompt, thread_id, status_placeholder, message_place
                 response_text = ""
                 message_placeholder.empty()
             elif response_text:
-                last_complete_response = response_text
+                cleaned = response_text.strip().lower()
+                if cleaned in router_keywords or all(kw in cleaned for kw in ["agente", "actuar"]):
+                    response_text = ""
+                    message_placeholder.empty()
+                else:
+                    last_complete_response = response_text
 
     return last_complete_response if last_complete_response else response_text
 
