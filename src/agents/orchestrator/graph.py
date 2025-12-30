@@ -9,70 +9,151 @@ from src.agents.data_agent import DataAgent
 from src.agents.analysis_agent import AnalysisAgent
 from src.agents.memory_agent import MemoryAgent
 
-SYSTEM_PROMPT = """Eres un coordinador que decide qué agente debe actuar a continuación.
+# Prompt del router para decidir que agente utilizar
+ROUTER_PROMPT = """Eres un coordinador que decide qué agente especializado debe actuar.
 
 AGENTES DISPONIBLES:
-- data_agent: buscar clientes, obtener info de clientes, ver facturas, facturas vencidas/pendientes, verificar conexión
-- analysis_agent: predicciones de riesgo, aging report, portfolio summary, comparar clientes, tendencias, clientes de alto riesgo
-- memory_agent: guardar notas, recordar algo, ver notas del cliente, alertas
+- data_agent: Recupera datos de Odoo (buscar clientes, ver facturas, facturas vencidas/pendientes)
+- analysis_agent: Predicciones y análisis (riesgo de impago, aging report, portfolio, tendencias)
+- memory_agent: Gestión de notas y alertas (guardar/recuperar notas, alertas)
 
-REGLAS:
-1. Analiza el historial para ver si la solicitud del usuario YA FUE RESPONDIDA
-2. Si el Asistente ya dio una respuesta completa a lo que pidió el Usuario → responde FINISH
-3. Si necesitas datos que no tienes → usa el agente apropiado
-4. NUNCA repitas un agente si ya completó su tarea
+HISTORIAL DE CONVERSACIÓN:
+{conversation_history}
 
-Responde SOLO con: data_agent, analysis_agent, memory_agent o FINISH"""
+INFORMACIÓN RECOPILADA EN ESTA CONSULTA:
+{collected_data}
+
+PREGUNTA ACTUAL DEL USUARIO:
+{user_query}
+
+REGLAS DE DECISIÓN:
+1. Si la pregunta hace referencia a un cliente mencionado antes (ej: "sus facturas", "dame más info"), usa el contexto del historial
+2. Si no hay información recopilada y la pregunta necesita datos -> usa data_agent primero
+3. Si ya tienes datos del cliente y necesitas predicciones -> usa analysis_agent
+4. Si el usuario pide recordar algo o ver notas -> usa memory_agent
+5. Si ya tienes TODA la información necesaria para responder -> responde FINISH
+
+¿Qué agente debe actuar? Responde SOLO con: data_agent, analysis_agent, memory_agent o FINISH"""
+
+# Prompt del sintetizador, una vez se tienen todos los datos se genera la respuesta final
+# TODO: Sintentiza demasiado, hay que modificar este prompt
+FINAL_ANSWER_PROMPT = """Eres un asistente financiero que genera respuestas claras y útiles.
+
+HISTORIAL DE CONVERSACIÓN:
+{conversation_history}
+
+PREGUNTA ACTUAL:
+{user_query}
+
+INFORMACIÓN RECOPILADA:
+{collected_data}
+
+Genera una respuesta concisa y profesional basada en la información recopilada.
+- Sé directo y claro
+- Si hay riesgos altos, destácalos
+- Usa formato legible (puedes usar listas si es apropiado)
+- Responde en español
+- NO inventes datos. Usa SOLO la información proporcionada en "INFORMACIÓN RECOPILADA"."""
 
 
 class Orchestrator:
-    """Supervisor que coordina DataAgent, AnalysisAgent y MemoryAgent."""
+    """Orquestador que coordina agentes y sintetiza respuestas."""
+    # TODO: Mencionado en el estado también pero habría que buscar otra solución para los bucles infinitos
+    MAX_ITERATIONS = 5
+    MAX_HISTORY_MESSAGES = 10
+
     def __init__(self):
         self.llm = ChatMistralAI(
             model="mistral-large-latest",
             temperature=0,
             api_key=settings.API_MISTRAL_KEY
         )
+        # TODO: Esto en vez de crearse aquí, se tendrían que comunicar a través de MCP
         self.data_agent = DataAgent()
         self.analysis_agent = AnalysisAgent()
+        # TODO: No funciona ...
         self.memory_agent = MemoryAgent()
         self.checkpointer = MemorySaver()
         self.graph = self._build_graph()
 
     def _build_graph(self):
-        """Construye el grafo del supervisor."""
         builder = StateGraph(AgentState)
+
         # Nodos
         builder.add_node("router", self._router)
         builder.add_node("data_agent", self._run_data_agent)
         builder.add_node("analysis_agent", self._run_analysis_agent)
         builder.add_node("memory_agent", self._run_memory_agent)
+        builder.add_node("final_answer", self._generate_final_answer)
 
         # Grafo
-        # START -> Router decide que agente usar -> Actúa el agente -> Router -> ... -> END
+        # Petición -> Router -> Agente -> Router -> ... -> Sintentizador -> Respuesta final
         builder.add_edge(START, "router")
         builder.add_conditional_edges("router", self._route, {
             "data_agent": "data_agent",
             "analysis_agent": "analysis_agent",
             "memory_agent": "memory_agent",
-            "FINISH": END
+            "final_answer": "final_answer"
         })
         builder.add_edge("data_agent", "router")
         builder.add_edge("analysis_agent", "router")
         builder.add_edge("memory_agent", "router")
+        builder.add_edge("final_answer", END)
 
         return builder.compile(checkpointer=self.checkpointer)
 
-    def _router(self, state: AgentState) -> dict:
-        """Decide a qué agente usar."""
-        messages = state["messages"]
-        router_prompt = self._build_router_prompt(messages)
-        # TODO: Posiblemente será necesario añadir al estado una variable de iteraciones para evitar bucles infinitos
+    def _extract_conversation_history(self, messages: list) -> str:
+        """Extrae el historial de conversación de los mensajes."""
+        if not messages:
+            return "Sin historial previo."
 
+        # Tomamos los últimos N mensajes (excluyendo el mensaje actual)
+        recent = messages[:-1] if len(messages) > 1 else []
+        recent = recent[-self.MAX_HISTORY_MESSAGES:]
+        if not recent:
+            return "Sin historial previo."
+
+        # Construimos el historial
+        lines = []
+        for msg in recent:
+            if isinstance(msg, HumanMessage):
+                lines.append(f"Usuario: {msg.content}")
+            elif isinstance(msg, AIMessage) and msg.content:
+                content = msg.content
+                lines.append(f"Asistente: {content}")
+
+        return "\n".join(lines) if lines else "Sin historial previo."
+
+    def _router(self, state: AgentState) -> dict:
+        """Decide qué agente usar en base a la información recopilada."""
+        curr_info = state.get("collected_data", [])
+        user_query = state.get("user_query", "")
+        iterations = state.get("iterations", 0)
+        messages = state.get("messages", [])
+
+        # Evitar bucles infinitos
+        # TODO: Mencionado en varios sitios, se debe buscar otra solución
+        if iterations >= self.MAX_ITERATIONS:
+            return {"next_agent": None, "iterations": iterations + 1}
+
+        # Formateamos los datos existentes
+        collected_str = "\n".join(curr_info) if curr_info else "Ninguna información recopilada aún."
+        history_str = self._extract_conversation_history(messages)
+
+        prompt = ROUTER_PROMPT.format(
+            conversation_history=history_str,
+            collected_data=collected_str,
+            user_query=user_query
+        )
+
+        # TODO: SystemMessage redundante con el prompt, sacado de la antigua arquitectura
         response = self.llm.invoke([
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=router_prompt)
+            SystemMessage(
+                content="Eres un router que decide qué agente usar. "
+                        "Responde solo con el nombre del agente o FINISH."),
+            HumanMessage(content=prompt)
         ])
+
         decision = response.content.strip().lower()
 
         if "data_agent" in decision or "data" in decision:
@@ -84,85 +165,125 @@ class Orchestrator:
         else:
             next_agent = None
 
-        return {"next_agent": next_agent}
-
-    def _build_conversation_context(self, messages: list, limit: int = 10) -> str:
-        """Extrae el contexto de conversación de los mensajes."""
-        lines = []
-        for msg in messages:
-            if isinstance(msg, HumanMessage):
-                lines.append(f"Usuario: {msg.content}")
-            elif isinstance(msg, AIMessage) and msg.content.strip() and not msg.tool_calls:
-                lines.append(f"Asistente: {msg.content}")
-        return "\n".join(lines[-limit:])
-
-    def _build_router_prompt(self, messages: list) -> str:
-        history = self._build_conversation_context(messages)
-        has_response = any(
-            isinstance(msg, AIMessage) and msg.content.strip() and not getattr(msg, 'tool_calls', None)
-            for msg in messages[1:]
-        )
-        status = "El asistente YA RESPONDIÓ." if has_response else "Pendiente de respuesta."
-        return f"""HISTORIAL:
-    {history}
-
-    ESTADO: {status}
-    
-    ¿Qué agente debe actuar ahora? (data_agent, analysis_agent, memory_agent, o FINISH)"""
+        return {"next_agent": next_agent, "iterations": iterations + 1}
 
     def _route(self, state: AgentState) -> str:
-        """Función de routing basada en next_agent."""
         next_agent = state.get("next_agent")
-        return next_agent if next_agent else "FINISH"
+        if next_agent:
+            return next_agent
+        return "final_answer"
 
+    # TODO: Código redundante
     async def _run_data_agent(self, state: AgentState) -> dict:
-        """Ejecuta el DataAgent."""
-        context = self._build_conversation_context(state["messages"])
+        user_query = state.get("user_query", "")
+        collected = state.get("collected_data", []).copy()
+        messages = state.get("messages", [])
+        context = self._build_context_for_subagent(user_query, collected, messages)
+
         result = await self.data_agent.run([HumanMessage(content=context)])
-        return {"messages": self._extract_final_response(result["messages"])}
+        response = self.data_agent.extract_final_response(result)
+        if response:
+            collected.append(f"[DataAgent]: {response}")
+
+        return {"collected_data": collected}
 
     async def _run_analysis_agent(self, state: AgentState) -> dict:
-        """Ejecuta el AnalysisAgent."""
-        context = self._build_conversation_context(state["messages"])
+        user_query = state.get("user_query", "")
+        collected = state.get("collected_data", []).copy()
+        messages = state.get("messages", [])
+        context = self._build_context_for_subagent(user_query, collected, messages)
+
         result = await self.analysis_agent.run([HumanMessage(content=context)])
-        return {"messages": self._extract_final_response(result["messages"])}
+        response = self.analysis_agent.extract_final_response(result)
+        if response:
+            collected.append(f"[AnalysisAgent]: {response}")
+
+        return {"collected_data": collected}
 
     async def _run_memory_agent(self, state: AgentState) -> dict:
-        """Ejecuta el MemoryAgent."""
-        context = self._build_conversation_context(state["messages"])
-        result = await self.memory_agent.run([HumanMessage(content=context)])
-        return {"messages": self._extract_final_response(result["messages"])}
+        user_query = state.get("user_query", "")
+        collected = state.get("collected_data", []).copy()
+        messages = state.get("messages", [])
+        context = self._build_context_for_subagent(user_query, collected, messages)
 
-    def _extract_final_response(self, messages: list) -> list:
-        """Extrae solo la respuesta final de un sub-agente."""
-        for msg in reversed(messages):
-            if isinstance(msg, AIMessage) and msg.content.strip() and not msg.tool_calls:
-                return [msg]
-        return []
+        result = await self.memory_agent.run([HumanMessage(content=context)])
+        response = self.memory_agent.extract_final_response(result)
+        if response:
+            collected.append(f"[MemoryAgent]: {response}")
+
+        return {"collected_data": collected}
+
+    # TODO: Valorar simplificar método con el del orquestador
+    def _build_context_for_subagent(self, user_query: str, collected: list, messages: list) -> str:
+        context_parts = []
+        history = self._extract_conversation_history(messages)
+        if history != "Sin historial previo.":
+            context_parts.append(f"HISTORIAL DE CONVERSACIÓN:\n{history}\n")
+        context_parts.append(f"SOLICITUD ACTUAL: {user_query}")
+
+        if collected:
+            context_parts.append("\nINFORMACIÓN YA RECOPILADA:")
+            for item in collected:
+                context_parts.append(item)
+        context_parts.append(
+            "\nIMPORTANTE: Si la solicitud hace referencia a algo del historial (ej: 'sus facturas', 'de ese cliente'), usa ese contexto para identificar el cliente/factura correcta.")
+
+        return "\n".join(context_parts)
+
+    def _generate_final_answer(self, state: AgentState) -> dict:
+        collected = state.get("collected_data", [])
+        user_query = state.get("user_query", "")
+        messages = state.get("messages", [])
+        history_str = self._extract_conversation_history(messages)
+
+        if not collected:
+            response = self.llm.invoke([
+                SystemMessage(content="Eres un asistente financiero. Responde en español. NO inventes datos."),
+                HumanMessage(content=f"Historial: {history_str}\n\nPregunta: {user_query}")
+            ])
+            final_response = response.content
+        else:
+            collected_str = "\n".join(collected)
+            prompt = FINAL_ANSWER_PROMPT.format(
+                conversation_history=history_str,
+                user_query=user_query,
+                collected_data=collected_str
+            )
+
+            response = self.llm.invoke([
+                SystemMessage(
+                    content="Genera una respuesta clara y útil basada SOLO en la información proporcionada. NO inventes datos."),
+                HumanMessage(content=prompt)
+            ])
+            final_response = response.content
+
+        return {"messages": [AIMessage(content=final_response)]}
 
     async def run(self, request: str, thread_id: str) -> str:
-        """Procesa una solicitud y devuelve la respuesta."""
         config = {"configurable": {"thread_id": thread_id}}
         initial_state = {
             "messages": [HumanMessage(content=request)],
-            "next_agent": None
+            "user_query": request,
+            "next_agent": None,
+            "collected_data": [],
+            "iterations": 0
         }
-
         final_state = await self.graph.ainvoke(initial_state, config=config)
 
-        for msg in reversed(final_state["messages"]):
+        for msg in reversed(final_state.get("messages", [])):
             if isinstance(msg, AIMessage) and msg.content:
                 return msg.content
 
-        return "No se ha podido procesar tu solicitud."
-
+        return "No se pudo procesar tu solicitud."
 
     async def stream(self, request: str, thread_id: str):
-        """Procesa en modo streaming."""
         config = {"configurable": {"thread_id": thread_id}}
         initial_state = {
             "messages": [HumanMessage(content=request)],
-            "next_agent": None
+            "user_query": request,
+            "next_agent": None,
+            "collected_data": [],
+            "iterations": 0
         }
 
         async for event in self.graph.astream_events(initial_state, config=config):

@@ -3,6 +3,8 @@ from .tools import ANALYSIS_TOOLS
 
 PROMPT = """Eres un agente de análisis de riesgo y predicciones.
 
+Tu rol es realizar análisis y predicciones. Devuelve resultados de forma estructurada.
+
 HERRAMIENTAS:
 - predict_invoice_risk: Predice riesgo de factura existente (necesita invoice_id)
 - predict_hypothetical_invoice: Predice factura hipotética (partner_id + importe)
@@ -13,11 +15,11 @@ HERRAMIENTAS:
 - get_client_trend: Tendencia de un cliente (mejora/empeora/estable)
 - get_deteriorating_clients: Clientes que están empeorando
 
-IMPORTANTE:
-- Siempre indica las probabilidades junto a la predicción
-- Si detectas inconsistencia entre predicción e historial, adviértelo
-- NO recuperes datos básicos de clientes, eso lo hace otro agente
-- Responde en español"""
+FORMATO DE RESPUESTA:
+- Siempre incluye las probabilidades junto a las predicciones
+- Para predicciones: "Predicción: [categoría] - Probabilidades: [detalle]"
+- Si detectas inconsistencias, repórtalas
+- Sé conciso y estructurado"""
 
 
 class AnalysisAgent(BaseAgent):

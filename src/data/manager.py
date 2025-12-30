@@ -654,13 +654,17 @@ class DataManager:
     async def get_client_trend(self, partner_id: int, recent_months: int = 6) -> Optional[ClientTrend]:
         """Analiza la tendencia de comportamiento de pago de un cliente."""
         df = await self._get_client_invoices_df(partner_id)
+        print("1")
+        print(partner_id)
+        print("Recent months ", recent_months)
         if df.empty:
             return None
-
+        print(len(df))
+        print("2")
         paid_df = df[df['payment_state'] == 'paid'].copy()
         if len(paid_df) < 4:  # Mínimo para calcular tendencia
             return None
-
+        print("3")
         cutoff = pd.Timestamp(self.cutoff)
         recent_start = cutoff - pd.DateOffset(months=recent_months)
         recent = paid_df[paid_df['invoice_date'] >= recent_start]
