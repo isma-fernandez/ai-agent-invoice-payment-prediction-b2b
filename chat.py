@@ -3,6 +3,7 @@ import re
 import uuid
 import streamlit as st
 from src.agents.orchestrator import FinancialAgent
+from src.agents.messages import get_agent_message, get_tool_message
 from src.utils.chart_generator import chart_generator
 
 st.title("Asistente de facturación")
@@ -24,12 +25,13 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": """¡Hola! Soy tu asistente financiero. Puedo ayudarte con las siguientes tareas
-        
+            "content": """Hola, soy tu asistente financiero. Puedo ayudarte con:
+
 1. **Buscar información sobre clientes:** Obtener detalles de un cliente por su nombre.
 2. **Consultar estadísticas de pago:** Ver historial y métricas clave.
 3. **Ver facturas:** Revisar facturas pagadas, pendientes o vencidas.
 4. **Predecir riesgo de impago:** Evaluar facturas existentes o hipotéticas.
+5. **Análisis de cartera:** Aging report, resumen de portfolio, tendencias.
 
 ¿Qué te gustaría hacer hoy?"""
         }
@@ -41,56 +43,73 @@ for message in st.session_state.messages:
 
 
 async def run_stream(agent, prompt, thread_id, status_placeholder, message_placeholder):
-    """Ejecuta el agente en modo streaming."""
-    response_text = ""
-    current_tool = None
-    last_complete_response = ""
-
-    router_keywords = {"data_agent", "analysis_agent", "memory_agent", "finish"}
+    """Ejecuta el agente en modo streaming mostrando solo estados relevantes."""
+    final_response = ""
+    is_final_answer = False
+    current_node = None
 
     async for event in agent.stream_request(prompt, thread_id):
         kind = event.get("event")
         name = event.get("name", "")
 
-        if "router" in name.lower():
-            continue
+        # Detectar inicio de nodo
+        if kind == "on_chain_start":
+            node_name = name.lower()
 
-        if kind == "on_tool_start":
-            tool_name = event.get("name", "herramienta")
-            current_tool = tool_name
-            status_placeholder.info(f"Usando: {tool_name}...")
+            # Router: ignorar completamente
+            if "router" in node_name:
+                current_node = "router"
+                continue
+
+            # Respuesta final: activar streaming de texto
+            if "final_answer" in node_name:
+                is_final_answer = True
+                current_node = "final_answer"
+                status_placeholder.info("Generando respuesta...")
+                continue
+
+            # Subagentes: mostrar mensaje correspondiente
+            agent_msg = get_agent_message(node_name)
+            if agent_msg:
+                current_node = node_name
+                status_placeholder.info(agent_msg)
+
+        # Herramientas: mostrar mensaje amigable
+        elif kind == "on_tool_start":
+            tool_name = event.get("name", "")
+            tool_msg = get_tool_message(tool_name)
+            status_placeholder.info(tool_msg)
 
         elif kind == "on_tool_end":
-            if current_tool:
-                status_placeholder.success(f"{current_tool}")
-            current_tool = None
+            # Restaurar mensaje del agente actual
+            if current_node:
+                agent_msg = get_agent_message(current_node)
+                if agent_msg:
+                    status_placeholder.info(agent_msg)
 
-        elif kind == "on_chat_model_start":
-            response_text = ""
-            status_placeholder.info("Procesando...")
-
+        # Streaming de texto SOLO en respuesta final
         elif kind == "on_chat_model_stream":
-            chunk = event.get("data", {}).get("chunk")
-            if chunk and hasattr(chunk, "content") and chunk.content:
-                response_text += chunk.content
-                message_placeholder.markdown(response_text + "|")
+            if is_final_answer:
+                chunk = event.get("data", {}).get("chunk")
+                if chunk and hasattr(chunk, "content") and chunk.content:
+                    final_response += chunk.content
+                    message_placeholder.markdown(final_response + "▌")
 
         elif kind == "on_chat_model_end":
-            status_placeholder.empty()
-            output = event.get("data", {}).get("output")
+            if is_final_answer:
+                status_placeholder.empty()
+                if final_response:
+                    message_placeholder.markdown(final_response)
 
-            if output and hasattr(output, "tool_calls") and output.tool_calls:
-                response_text = ""
-                message_placeholder.empty()
-            elif response_text:
-                cleaned = response_text.strip().lower()
-                if cleaned in router_keywords or all(kw in cleaned for kw in ["agente", "actuar"]):
-                    response_text = ""
-                    message_placeholder.empty()
-                else:
-                    last_complete_response = response_text
+        # Fin de nodo
+        elif kind == "on_chain_end":
+            node_name = name.lower()
+            if "final_answer" in node_name:
+                is_final_answer = False
+            elif current_node and current_node in node_name:
+                current_node = None
 
-    return last_complete_response if last_complete_response else response_text
+    return final_response
 
 
 if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
@@ -112,12 +131,12 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
             ))
 
             if final_response:
-                # Eliminar gráficos del texto
+                # Eliminar marcadores de gráficos del texto
                 chart_matches = re.findall(r'CHART:([a-f0-9]+)', final_response)
                 clean_response = re.sub(r'CHART:[a-f0-9]+', '', final_response).strip()
                 message_placeholder.markdown(clean_response)
 
-                # Renderizar gráficos
+                # Renderizar gráficos si existen
                 for chart_id in chart_matches:
                     fig = chart_generator.get_chart(chart_id)
                     if fig:
@@ -126,14 +145,18 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
 
                 st.session_state.messages.append({"role": "assistant", "content": clean_response})
             else:
+                # Fallback: proceso sin streaming
+                status_placeholder.info("Procesando consulta...")
                 final_response = asyncio.run(st.session_state.agent.process_request(
                     prompt, thread_id=st.session_state.thread_id
                 ))
+                status_placeholder.empty()
                 message_placeholder.markdown(final_response)
                 st.session_state.messages.append({"role": "assistant", "content": final_response})
 
         except Exception as e:
-            st.error(f"Ocurrió un error: {e}")
+            status_placeholder.empty()
+            st.error(f"Error al procesar la consulta: {e}")
             import traceback
 
             st.code(traceback.format_exc())

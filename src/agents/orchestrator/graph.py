@@ -193,9 +193,16 @@ class Orchestrator:
         messages = state.get("messages", [])
         history_str = self._extract_conversation_history(messages)
 
+        system_instruction = (
+            "Eres un asistente financiero profesional. "
+            "Responde en español, sin emojis, de forma directa. "
+            "Adapta la extensión a la complejidad de la pregunta. "
+            "NO resumas datos numéricos. NO inventes datos."
+        )
+
         if not collected:
             response = self.llm.invoke([
-                SystemMessage(content="Eres un asistente financiero. Responde en español. NO inventes datos."),
+                SystemMessage(content=system_instruction),
                 HumanMessage(content=f"Historial: {history_str}\n\nPregunta: {user_query}")
             ])
             final_response = response.content

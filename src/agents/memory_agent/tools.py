@@ -2,6 +2,12 @@ from langchain_core.tools import tool
 from src.data.models import Memory, MemoryType
 from src.agents.shared import get_memory_store
 
+TOOL_MESSAGES = {
+    "save_client_note": "Guardando nota del cliente...",
+    "get_client_notes": "Recuperando notas del cliente...",
+    "save_alert": "Registrando alerta...",
+    "get_active_alerts": "Consultando alertas activas...",
+}
 
 @tool
 async def save_client_note(partner_id: int, partner_name: str, note: str) -> str:

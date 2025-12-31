@@ -7,6 +7,18 @@ from src.data.models import (
 from src.agents.shared import get_data_manager
 
 
+# Mensajes para chat.py
+TOOL_MESSAGES = {
+    "predict_invoice_risk": "Analizando riesgo de la factura...",
+    "predict_hypothetical_invoice": "Calculando predicción hipotética...",
+    "get_high_risk_clients": "Identificando clientes de alto riesgo...",
+    "compare_clients": "Comparando clientes...",
+    "get_aging_report": "Generando informe de antigüedad...",
+    "get_portfolio_summary": "Generando resumen de cartera...",
+    "get_client_trend": "Analizando tendencia del cliente...",
+    "get_deteriorating_clients": "Identificando clientes en deterioro...",
+}
+
 @tool
 async def check_connection() -> bool:
     """Verifica si el DataManager está conectado."""
