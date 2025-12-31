@@ -418,48 +418,6 @@ class DataManager:
         return round(min(score, 100), 2)
 
 
-    async def get_overdue_invoices(self, limit: int = 10, min_days_overdue: int = 1) -> List[InvoiceSummary]:
-        """Obtiene facturas vencidas de todos los clientes."""
-        raw_invoices = await self.data_retriever.get_all_overdue_invoices(
-            min_days_overdue=min_days_overdue,
-            limit=limit * 2
-        )
-        if not raw_invoices:
-            return []
-
-        cutoff = pd.Timestamp(self.cutoff)
-        results = []
-
-        for inv in raw_invoices:
-            partner_id = inv['partner_id']
-            partner_name = None
-
-            if isinstance(partner_id, (list, tuple)):
-                partner_name = partner_id[1]
-                partner_id = partner_id[0]
-
-            due_date = pd.Timestamp(inv['invoice_date_due'])
-            invoice_date = pd.Timestamp(inv['invoice_date'])
-            days_overdue = (cutoff - due_date).days
-            if days_overdue < min_days_overdue:
-                continue
-
-            results.append(InvoiceSummary(
-                id=inv['id'],
-                name=inv['name'],
-                amount_eur=round(float(inv.get('amount_residual', inv['amount_total'])), 2),
-                invoice_date=invoice_date.date(),
-                due_date=due_date.date(),
-                payment_state=PaymentState.NOT_PAID,
-                days_overdue=days_overdue,
-                partner_id=partner_id,
-                partner_name=partner_name
-            ))
-
-        results.sort(key=lambda x: x.days_overdue, reverse=True)
-        return results[:limit]
-
-
     async def get_high_risk_clients(self, limit: int = 10) -> List[ClientInfo]:
         """Obtiene los clientes con mayor riesgo, ordenados por risk_score."""
         partner_ids = await self.data_retriever.get_partners_with_overdue_invoices()
@@ -495,104 +453,113 @@ class DataManager:
         return results
 
 
-    async def get_upcoming_due_invoices(self, days_ahead: int = 7, limit: int = 20) -> List[InvoiceSummary]:
-        """Obtiene facturas que vencen en los próximos X días."""
-        cutoff = pd.Timestamp(self.cutoff)
-        end_date = (cutoff + pd.Timedelta(days=days_ahead)).strftime('%Y-%m-%d')
-
-        raw_invoices = await self.data_retriever.get_invoices_due_between(
-            start_date=self.cutoff,
-            end_date=end_date,
-            only_unpaid=True
-        )
-
-        if not raw_invoices:
-            return []
-
-        results = []
-        for inv in raw_invoices:
-            partner_id = inv['partner_id']
-            partner_name = None
-            if isinstance(partner_id, (list, tuple)):
-                partner_name = partner_id[1]
-                partner_id = partner_id[0]
-
-            due_date = pd.Timestamp(inv['invoice_date_due'])
-            days_until_due = (due_date - cutoff).days
-
-            results.append(InvoiceSummary(
-                id=inv['id'],
-                name=inv['name'],
-                amount_eur=round(float(inv.get('amount_residual', inv['amount_total'])), 2),
-                invoice_date=pd.Timestamp(inv['invoice_date']).date(),
-                due_date=due_date.date(),
-                payment_state=PaymentState.NOT_PAID,
-                days_overdue=-days_until_due,  # Negativo = días hasta vencimiento
-                partner_id=partner_id,
-                partner_name=partner_name
-            ))
-
-        results.sort(key=lambda x: x.due_date)
-        return results[:limit]
-
     async def get_aging_report(self, partner_id: int = None) -> AgingReport:
         """Genera informe de antigüedad de deuda (aging report)."""
-
         cutoff = pd.Timestamp(self.cutoff)
 
         if partner_id:
-            # Aging de un cliente específico
-            raw_invoices = await self.data_retriever.get_invoices_by_partner(partner_id)
-            # Filtrar solo vencidas no pagadas
-            raw_invoices = [
-                inv for inv in raw_invoices
-                if inv.get('payment_state') in ['not_paid', 'partial', False]
-                   and pd.Timestamp(inv['invoice_date_due']) < cutoff
-            ]
+            df = await self._get_client_invoices_df(partner_id)
+
+            if df.empty:
+                return AgingReport(
+                    total_overdue_eur=0,
+                    total_overdue_count=0,
+                    buckets=[],
+                    generated_at=cutoff.date()
+                )
+
+            df = df[
+                (df['payment_state'] == 'not_paid') &
+                (df['invoice_date_due'] < cutoff)
+                ]
+
+            if df.empty:
+                return AgingReport(
+                    total_overdue_eur=0,
+                    total_overdue_count=0,
+                    buckets=[],
+                    generated_at=cutoff.date()
+                )
+
+            df['days_overdue'] = (cutoff - df['invoice_date_due']).dt.days
+
+            buckets_data = {
+                '0-30': {'count': 0, 'amount': 0.0},
+                '31-60': {'count': 0, 'amount': 0.0},
+                '61-90': {'count': 0, 'amount': 0.0},
+                '>90': {'count': 0, 'amount': 0.0},
+            }
+
+            for _, row in df.iterrows():
+                days = row['days_overdue']
+                amount = row['amount_total_eur']
+
+                if days <= 30:
+                    buckets_data['0-30']['count'] += 1
+                    buckets_data['0-30']['amount'] += amount
+                elif days <= 60:
+                    buckets_data['31-60']['count'] += 1
+                    buckets_data['31-60']['amount'] += amount
+                elif days <= 90:
+                    buckets_data['61-90']['count'] += 1
+                    buckets_data['61-90']['amount'] += amount
+                else:
+                    buckets_data['>90']['count'] += 1
+                    buckets_data['>90']['amount'] += amount
+
+            total_amount = df['amount_total_eur'].sum()
+
         else:
-            # Aging global
             raw_invoices = await self.data_retriever.get_all_overdue_invoices(min_days_overdue=1, limit=0)
 
-        if not raw_invoices:
-            return AgingReport(
-                total_overdue_eur=0,
-                total_overdue_count=0,
-                buckets=[],
-                generated_at=cutoff.date()
-            )
+            if not raw_invoices:
+                return AgingReport(
+                    total_overdue_eur=0,
+                    total_overdue_count=0,
+                    buckets=[],
+                    generated_at=cutoff.date()
+                )
+            df = pd.DataFrame(raw_invoices)
+            df, _ = self._cleaner.clean_raw_data(df)
 
-        buckets_data = {
-            '0-30': {'count': 0, 'amount': 0.0},
-            '31-60': {'count': 0, 'amount': 0.0},
-            '61-90': {'count': 0, 'amount': 0.0},
-            '>90': {'count': 0, 'amount': 0.0},
-        }
+            if df.empty:
+                return AgingReport(
+                    total_overdue_eur=0,
+                    total_overdue_count=0,
+                    buckets=[],
+                    generated_at=cutoff.date()
+                )
+            df = df[df['payment_state'] == 'not_paid']
+            df['days_overdue'] = (cutoff - df['invoice_date_due']).dt.days
+            df = df[df['days_overdue'] > 0]
 
-        total_amount = 0.0
+            buckets_data = {
+                '0-30': {'count': 0, 'amount': 0.0},
+                '31-60': {'count': 0, 'amount': 0.0},
+                '61-90': {'count': 0, 'amount': 0.0},
+                '>90': {'count': 0, 'amount': 0.0},
+            }
 
-        for inv in raw_invoices:
-            due_date = pd.Timestamp(inv['invoice_date_due'])
-            days_overdue = (cutoff - due_date).days
-            amount = float(inv.get('amount_residual', inv['amount_total']))
+            for _, row in df.iterrows():
+                days = row['days_overdue']
+                amount = row['amount_total_eur']
 
-            if days_overdue <= 0:
-                continue
+                if days <= 30:
+                    buckets_data['0-30']['count'] += 1
+                    buckets_data['0-30']['amount'] += amount
+                elif days <= 60:
+                    buckets_data['31-60']['count'] += 1
+                    buckets_data['31-60']['amount'] += amount
+                elif days <= 90:
+                    buckets_data['61-90']['count'] += 1
+                    buckets_data['61-90']['amount'] += amount
+                else:
+                    buckets_data['>90']['count'] += 1
+                    buckets_data['>90']['amount'] += amount
 
-            total_amount += amount
+            total_amount = df['amount_total_eur'].sum()
 
-            if days_overdue <= 30:
-                buckets_data['0-30']['count'] += 1
-                buckets_data['0-30']['amount'] += amount
-            elif days_overdue <= 60:
-                buckets_data['31-60']['count'] += 1
-                buckets_data['31-60']['amount'] += amount
-            elif days_overdue <= 90:
-                buckets_data['61-90']['count'] += 1
-                buckets_data['61-90']['amount'] += amount
-            else:
-                buckets_data['>90']['count'] += 1
-                buckets_data['>90']['amount'] += amount
-
+        # Generar buckets
         buckets = []
         for label, data in buckets_data.items():
             pct = (data['amount'] / total_amount * 100) if total_amount > 0 else 0
@@ -608,57 +575,6 @@ class DataManager:
             total_overdue_count=sum(b.invoice_count for b in buckets),
             buckets=buckets,
             generated_at=cutoff.date()
-        )
-
-
-    async def get_portfolio_summary(self) -> PortfolioSummary:
-        """Genera resumen de cartera."""
-        raw_invoices = await self.data_retriever.get_all_unpaid_invoices(limit=0)
-
-        cutoff = pd.Timestamp(self.cutoff)
-
-        total_outstanding = 0.0
-        total_overdue = 0.0
-        total_not_due = 0.0
-        overdue_count = 0
-        not_due_count = 0
-        total_delay_days = 0.0
-        paid_count = 0
-
-        all_invoices = await self.data_retriever.get_all_outbound_invoices()
-        df = pd.DataFrame(all_invoices)
-        if not df.empty:
-            clean_df, _ = self._cleaner.clean_raw_data(df)
-            if not clean_df.empty:
-                paid_df = clean_df[clean_df['payment_state'] == 'paid']
-                if len(paid_df) > 0:
-                    paid_df = self._feature_engineering._add_payment_features(paid_df)
-                    total_delay_days = paid_df['payment_overdue_days'].sum()
-                    paid_count = len(paid_df)
-
-        for inv in raw_invoices:
-            amount = float(inv.get('amount_residual', inv['amount_total']))
-            due_date = pd.Timestamp(inv['invoice_date_due'])
-            total_outstanding += amount
-            if due_date < cutoff:
-                total_overdue += amount
-                overdue_count += 1
-            else:
-                total_not_due += amount
-                not_due_count += 1
-
-        avg_delay = (total_delay_days / paid_count) if paid_count > 0 else 0
-        dso = 30 + avg_delay
-
-        return PortfolioSummary(
-            total_outstanding_eur=round(total_outstanding, 2),
-            total_overdue_eur=round(total_overdue, 2),
-            total_not_due_eur=round(total_not_due, 2),
-            overdue_count=overdue_count,
-            not_due_count=not_due_count,
-            dso=round(dso, 1),
-            average_delay_days=round(avg_delay, 1),
-            generated_at=pd.Timestamp(self.cutoff).date()
         )
 
 
@@ -757,6 +673,161 @@ class DataManager:
         return results[:limit]
 
 
+    async def _clean_raw_invoices(self, raw_invoices: list) -> pd.DataFrame:
+        """Limpia una lista de facturas raw pasándolas por el cleaner."""
+        if not raw_invoices:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(raw_invoices)
+        clean_df, _ = self._cleaner.clean_raw_data(df)
+        return clean_df if clean_df is not None else pd.DataFrame()
+
+
+    async def get_overdue_invoices(self, limit: int = 10, min_days_overdue: int = 1) -> List[InvoiceSummary]:
+        """Obtiene facturas vencidas de todos los clientes."""
+        raw_invoices = await self.data_retriever.get_all_overdue_invoices(
+            min_days_overdue=min_days_overdue,
+            limit=limit * 3  # Pedir más porque el cleaner filtrará algunas
+        )
+
+        if not raw_invoices:
+            return []
+
+        df = await self._clean_raw_invoices(raw_invoices)
+
+        if df.empty:
+            return []
+
+        cutoff = pd.Timestamp(self.cutoff)
+
+        # Filtrar solo no pagadas y calcular días vencidos
+        df = df[df['payment_state'] == 'not_paid']
+        df['days_overdue'] = (cutoff - df['invoice_date_due']).dt.days
+        df = df[df['days_overdue'] >= min_days_overdue]
+
+        # Ordenar por días vencidos
+        df = df.sort_values('days_overdue', ascending=False).head(limit)
+
+        results = []
+        for _, row in df.iterrows():
+            results.append(InvoiceSummary(
+                id=int(row['id']),
+                name=row['name'],
+                amount_eur=round(float(row['amount_total_eur']), 2),
+                invoice_date=row['invoice_date'].date() if pd.notna(row['invoice_date']) else None,
+                due_date=row['invoice_date_due'].date() if pd.notna(row['invoice_date_due']) else None,
+                payment_state=PaymentState.NOT_PAID,
+                days_overdue=int(row['days_overdue']),
+                partner_id=int(row['partner_id']),
+                partner_name=row.get('partner_name')
+            ))
+
+        return results
+
+
+    async def get_upcoming_due_invoices(self, days_ahead: int = 7, limit: int = 20) -> List[InvoiceSummary]:
+        """Obtiene facturas que vencen en los próximos X días."""
+        cutoff = pd.Timestamp(self.cutoff)
+        end_date = (cutoff + pd.Timedelta(days=days_ahead)).strftime('%Y-%m-%d')
+
+        raw_invoices = await self.data_retriever.get_invoices_due_between(
+            start_date=self.cutoff,
+            end_date=end_date,
+            only_unpaid=True
+        )
+
+        if not raw_invoices:
+            return []
+
+        df = await self._clean_raw_invoices(raw_invoices)
+
+        if df.empty:
+            return []
+
+        # Filtrar no pagadas
+        df = df[df['payment_state'] == 'not_paid']
+
+        # Calcular días hasta vencimiento
+        df['days_until_due'] = (df['invoice_date_due'] - cutoff).dt.days
+        df = df.sort_values('days_until_due').head(limit)
+
+        results = []
+        for _, row in df.iterrows():
+            results.append(InvoiceSummary(
+                id=int(row['id']),
+                name=row['name'],
+                amount_eur=round(float(row['amount_total_eur']), 2),
+                invoice_date=row['invoice_date'].date() if pd.notna(row['invoice_date']) else None,
+                due_date=row['invoice_date_due'].date() if pd.notna(row['invoice_date_due']) else None,
+                payment_state=PaymentState.NOT_PAID,
+                days_overdue=-int(row['days_until_due']),  # Negativo = días hasta vencimiento
+                partner_id=int(row['partner_id']),
+                partner_name=row.get('partner_name')
+            ))
+
+        return results
+
+
+    async def get_portfolio_summary(self) -> PortfolioSummary:
+        """Genera resumen de cartera."""
+        # Obtener facturas no pagadas
+        raw_unpaid = await self.data_retriever.get_all_unpaid_invoices(limit=0)
+
+        df_unpaid = await self._clean_raw_invoices(raw_unpaid)
+
+        cutoff = pd.Timestamp(self.cutoff)
+
+        total_outstanding = 0.0
+        total_overdue = 0.0
+        total_not_due = 0.0
+        overdue_count = 0
+        not_due_count = 0
+
+        if not df_unpaid.empty:
+            df_unpaid = df_unpaid[df_unpaid['payment_state'] == 'not_paid']
+
+            for _, row in df_unpaid.iterrows():
+                amount = float(row['amount_total_eur'])
+                due_date = row['invoice_date_due']
+
+                total_outstanding += amount
+
+                if due_date < cutoff:
+                    total_overdue += amount
+                    overdue_count += 1
+                else:
+                    total_not_due += amount
+                    not_due_count += 1
+
+        # Obtener todas las facturas para calcular DSO
+        all_invoices = await self.data_retriever.get_all_outbound_invoices()
+        df_all = await self._clean_raw_invoices(all_invoices)
+
+        total_delay_days = 0.0
+        paid_count = 0
+
+        if not df_all.empty:
+            paid_df = df_all[df_all['payment_state'] == 'paid']
+            if len(paid_df) > 0:
+                paid_df = self._feature_engineering._add_payment_features(paid_df)
+                total_delay_days = paid_df['payment_overdue_days'].sum()
+                paid_count = len(paid_df)
+
+        avg_delay = (total_delay_days / paid_count) if paid_count > 0 else 0
+        dso = 30 + avg_delay
+
+        return PortfolioSummary(
+            total_outstanding_eur=round(total_outstanding, 2),
+            total_overdue_eur=round(total_overdue, 2),
+            total_not_due_eur=round(total_not_due, 2),
+            overdue_count=overdue_count,
+            not_due_count=not_due_count,
+            dso=round(dso, 1),
+            average_delay_days=round(avg_delay, 1),
+            generated_at=cutoff.date()
+        )
+
+
     async def get_invoices_by_period(self, start_date: str, end_date: str,
                                      partner_id: int = None, only_unpaid: bool = False) -> List[InvoiceSummary]:
         """Obtiene facturas emitidas en un período específico."""
@@ -770,36 +841,35 @@ class DataManager:
         if not raw_invoices:
             return []
 
+        df = await self._clean_raw_invoices(raw_invoices)
+
+        if df.empty:
+            return []
+
         cutoff = pd.Timestamp(self.cutoff)
+
+        # Filtrar si only_unpaid
+        if only_unpaid:
+            df = df[df['payment_state'] == 'not_paid']
+
+        df = df.sort_values('invoice_date', ascending=False)
+
         results = []
-
-        for inv in raw_invoices:
-            pid = inv['partner_id']
-            partner_name = None
-            if isinstance(pid, (list, tuple)):
-                partner_name = pid[1]
-                pid = pid[0]
-
-            due_date = pd.Timestamp(inv['invoice_date_due'])
-            invoice_date = pd.Timestamp(inv['invoice_date'])
-
+        for _, row in df.iterrows():
             days_overdue = None
-            payment_state = inv['payment_state']
-            if payment_state in ['not_paid', 'partial'] and due_date < cutoff:
-                days_overdue = (cutoff - due_date).days
+            if row['payment_state'] == 'not_paid' and row['invoice_date_due'] < cutoff:
+                days_overdue = (cutoff - row['invoice_date_due']).days
 
             results.append(InvoiceSummary(
-                id=inv['id'],
-                name=inv['name'],
-                amount_eur=round(float(inv.get('amount_residual', inv['amount_total'])), 2),
-                invoice_date=invoice_date.date(),
-                due_date=due_date.date(),
-                payment_state=PaymentState(payment_state) if payment_state in ['paid',
-                                                                               'not_paid'] else PaymentState.NOT_PAID,
+                id=int(row['id']),
+                name=row['name'],
+                amount_eur=round(float(row['amount_total_eur']), 2),
+                invoice_date=row['invoice_date'].date() if pd.notna(row['invoice_date']) else None,
+                due_date=row['invoice_date_due'].date() if pd.notna(row['invoice_date_due']) else None,
+                payment_state=PaymentState(row['payment_state']),
                 days_overdue=days_overdue,
-                partner_id=pid,
-                partner_name=partner_name
+                partner_id=int(row['partner_id']),
+                partner_name=row.get('partner_name')
             ))
 
-        results.sort(key=lambda x: x.invoice_date, reverse=True)
         return results

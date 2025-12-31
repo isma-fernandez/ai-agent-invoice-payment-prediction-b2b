@@ -88,6 +88,14 @@ class Orchestrator:
         iterations = state.get("iterations", 0)
         messages = state.get("messages", [])
 
+        # DEBUG
+        print(f"\n{'=' * 50}")
+        print(f"ROUTER - Iteración {iterations}")
+        print(f"Query: {user_query}")
+        print(f"Collected data: {curr_info}")
+        print(f"Messages count: {len(messages)}")
+        print(f"{'=' * 50}\n")
+
         # Evitar bucles infinitos
         # TODO: Mencionado en varios sitios, se debe buscar otra solución
         if iterations >= self.MAX_ITERATIONS:
@@ -194,6 +202,12 @@ class Orchestrator:
         user_query = state.get("user_query", "")
         messages = state.get("messages", [])
         history_str = self._extract_conversation_history(messages)
+
+        # DEBUG
+        print(f"\n{'=' * 50}")
+        print(f"FINAL ANSWER")
+        print(f"Collected data: {collected}")
+        print(f"{'=' * 50}\n")
 
         # Necesario para graficar correctamente los gráficos
         chart_markers = []

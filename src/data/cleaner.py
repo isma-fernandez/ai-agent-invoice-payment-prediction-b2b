@@ -34,7 +34,8 @@ class DataCleaner:
 
         # TODO: buscar una forma de actualizar estas tasas dinámicamente
         self._currency_rates = RATES
-
+        # Umbral máximo de importe para filtrar facturas erróneas
+        self.max_invoice_amount_eur = 1_000_000
 
     def clean_raw_data(self, invoices_df: pd.DataFrame, 
                        partners_df: pd.DataFrame = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -88,6 +89,9 @@ class DataCleaner:
 
         # Convertir amount_total a EUR
         df = self._convert_amounts_to_eur(df)
+
+        # Outliers
+        df = df[df['amount_total_eur'] <= self.max_invoice_amount_eur]
 
         # Limpiar y procesar fechas de pago
         df = self._clean_payment_dates(df)

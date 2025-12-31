@@ -3,6 +3,17 @@ ROUTER_PROMPT = """INFORMACIÓN RECOPILADA:
 
 ---
 
+IMPORTANTE - REFERENCIAS CONTEXTUALES:
+Si la pregunta actual usa pronombres o referencias vagas como:
+- "cada uno", "estos", "esos", "ellos" → Buscar en el HISTORIAL qué entidades se mencionaron
+- "ese cliente", "esa factura" → Identificar el cliente/factura del HISTORIAL
+- "cuánto debe", "sus facturas" → Relacionar con clientes del HISTORIAL
+
+Si el HISTORIAL contiene información que responde la pregunta actual (como importes de deuda por cliente),
+indica FINISH para que el sintetizador use esos datos directamente.
+
+---
+
 REGLA PRINCIPAL: Si ya hay [MemoryAgent] o [AnalysisAgent] en la información de arriba → responde FINISH.
 
 ---
