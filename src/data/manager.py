@@ -418,7 +418,7 @@ class DataManager:
         return round(min(score, 100), 2)
 
 
-    async def get_high_risk_clients(self, limit: int = 10) -> List[ClientInfo]:
+    async def get_high_risk_clients(self, limit: int = None) -> List[ClientInfo]:
         """Obtiene los clientes con mayor riesgo, ordenados por risk_score."""
         partner_ids = await self.data_retriever.get_partners_with_overdue_invoices()
         if not partner_ids:
@@ -433,6 +433,8 @@ class DataManager:
 
         # Ordenar por riesgo
         results.sort(key=lambda x: x.risk_score, reverse=True)
+        if limit is None:
+            return results
         return results[:limit]
 
 
@@ -683,12 +685,19 @@ class DataManager:
         return clean_df if clean_df is not None else pd.DataFrame()
 
 
-    async def get_overdue_invoices(self, limit: int = 10, min_days_overdue: int = 1) -> List[InvoiceSummary]:
+    async def get_overdue_invoices(self, limit: int = None, min_days_overdue: int = 1) -> List[InvoiceSummary]:
         """Obtiene facturas vencidas de todos los clientes."""
-        raw_invoices = await self.data_retriever.get_all_overdue_invoices(
-            min_days_overdue=min_days_overdue,
-            limit=limit * 3  # Pedir más porque el cleaner filtrará algunas
-        )
+        print("LIMITTTT: ", limit)
+        print("#############\n############\n#############")
+        if limit:
+            raw_invoices = await self.data_retriever.get_all_overdue_invoices(
+                min_days_overdue=min_days_overdue,
+                limit=limit * 3
+            )
+        else:
+            raw_invoices = await self.data_retriever.get_all_overdue_invoices(
+                min_days_overdue=min_days_overdue
+            )
 
         if not raw_invoices:
             return []

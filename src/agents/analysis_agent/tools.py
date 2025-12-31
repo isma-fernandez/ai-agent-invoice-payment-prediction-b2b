@@ -46,7 +46,7 @@ async def predict_hypothetical_invoice(partner_id: int, amount_eur: float, payme
     )
 
 @tool
-async def get_high_risk_clients(limit: int = 10) -> list[ClientInfo]:
+async def get_high_risk_clients(limit: int = None) -> list[ClientInfo]:
     """Obtiene los clientes con mayor riesgo de impago ordenados por puntuación.
     Calcula un risk_score (0-100) basado en ratio de puntualidad,
     promedio de retraso y facturas vencidas actuales.
@@ -60,6 +60,8 @@ async def get_high_risk_clients(limit: int = 10) -> list[ClientInfo]:
         list[ClientInfo]: Clientes ordenados por riesgo (mayor primero).
     """
     dm = get_data_manager()
+    if limit is None:
+        return await dm.get_high_risk_clients()
     return await dm.get_high_risk_clients(limit=limit)
 
 

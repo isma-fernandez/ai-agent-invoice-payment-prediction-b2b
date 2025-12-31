@@ -16,6 +16,21 @@ indica FINISH para que el sintetizador use esos datos directamente.
 
 REGLA PRINCIPAL: Si ya hay [MemoryAgent] o [AnalysisAgent] en la información de arriba → responde FINISH.
 
+REGLAS PRIORITARIAS (evaluar PRIMERO, en orden):
+
+1. GRÁFICOS EXPLÍCITOS:
+   Si el usuario pide gráfico ("gráfico", "chart", "visualiza", "dibuja", "representa"):
+   → analysis_agent
+
+2. ANÁLISIS CON GRÁFICO OBLIGATORIO:
+   Si el usuario pide cualquiera de estos (aunque los datos estén en el historial):
+   - "aging", "aging bucket", "aging report", "antigüedad de deuda"
+   - "portfolio", "resumen de cartera", "estado de cartera"
+   - "clientes de alto riesgo", "high risk", "mayor riesgo"
+   - "comparar clientes", "comparativa"
+   - "clientes empeorando", "deteriorating"
+   → analysis_agent (genera datos + gráfico)
+   
 ---
 
 AGENTES DISPONIBLES:

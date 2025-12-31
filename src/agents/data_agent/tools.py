@@ -88,7 +88,7 @@ async def get_invoice_by_name(invoice_name: str) -> InvoiceSummary | None:
 
 
 @tool(args_schema=GetOverdueInvoicesInput)
-async def get_overdue_invoices(limit: int = 10, min_days_overdue: int = 1) -> list[InvoiceSummary]:
+async def get_overdue_invoices(limit: int = None, min_days_overdue: int = 1) -> list[InvoiceSummary]:
     """Obtiene las facturas vencidas de todos los clientes del sistema.
     Útil para identificar cobros urgentes. Busca en TODOS los clientes, no solo uno.
     Esto incluye ID de factura, nombre, monto en EUR, fecha de factura,
@@ -103,6 +103,8 @@ async def get_overdue_invoices(limit: int = 10, min_days_overdue: int = 1) -> li
         list[InvoiceSummary]: Lista de facturas vencidas con información del cliente.
     """
     dm = get_data_manager()
+    if limit is None:
+        return await dm.get_overdue_invoices(min_days_overdue=min_days_overdue)
     return await dm.get_overdue_invoices(limit=limit, min_days_overdue=min_days_overdue)
 
 
