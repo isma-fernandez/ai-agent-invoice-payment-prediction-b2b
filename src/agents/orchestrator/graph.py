@@ -8,52 +8,7 @@ from src.agents.state import AgentState
 from src.agents.data_agent import DataAgent
 from src.agents.analysis_agent import AnalysisAgent
 from src.agents.memory_agent import MemoryAgent
-
-# Prompt del router para decidir que agente utilizar
-ROUTER_PROMPT = """Eres un coordinador que decide qué agente especializado debe actuar.
-
-AGENTES DISPONIBLES:
-- data_agent: Recupera datos de Odoo (buscar clientes, ver facturas, facturas vencidas/pendientes)
-- analysis_agent: Predicciones y análisis (riesgo de impago, aging report, portfolio, tendencias)
-- memory_agent: Gestión de notas y alertas (guardar/recuperar notas, alertas)
-
-HISTORIAL DE CONVERSACIÓN:
-{conversation_history}
-
-INFORMACIÓN RECOPILADA EN ESTA CONSULTA:
-{collected_data}
-
-PREGUNTA ACTUAL DEL USUARIO:
-{user_query}
-
-REGLAS DE DECISIÓN:
-1. Si la pregunta hace referencia a un cliente mencionado antes (ej: "sus facturas", "dame más info"), usa el contexto del historial
-2. Si no hay información recopilada y la pregunta necesita datos -> usa data_agent primero
-3. Si ya tienes datos del cliente y necesitas predicciones -> usa analysis_agent
-4. Si el usuario pide recordar algo o ver notas -> usa memory_agent
-5. Si ya tienes TODA la información necesaria para responder -> responde FINISH
-
-¿Qué agente debe actuar? Responde SOLO con: data_agent, analysis_agent, memory_agent o FINISH"""
-
-# Prompt del sintetizador, una vez se tienen todos los datos se genera la respuesta final
-# TODO: Sintentiza demasiado, hay que modificar este prompt
-FINAL_ANSWER_PROMPT = """Eres un asistente financiero que genera respuestas claras y útiles.
-
-HISTORIAL DE CONVERSACIÓN:
-{conversation_history}
-
-PREGUNTA ACTUAL:
-{user_query}
-
-INFORMACIÓN RECOPILADA:
-{collected_data}
-
-Genera una respuesta concisa y profesional basada en la información recopilada.
-- Sé directo y claro
-- Si hay riesgos altos, destácalos
-- Usa formato legible (puedes usar listas si es apropiado)
-- Responde en español
-- NO inventes datos. Usa SOLO la información proporcionada en "INFORMACIÓN RECOPILADA"."""
+from .prompts import ROUTER_PROMPT, FINAL_ANSWER_PROMPT
 
 
 class Orchestrator:
@@ -225,6 +180,8 @@ class Orchestrator:
             context_parts.append("\nINFORMACIÓN YA RECOPILADA:")
             for item in collected:
                 context_parts.append(item)
+            context_parts.append(
+                "\nIMPORTANTE: Usa los IDs (partner_id, invoice_id) de la información recopilada. NO inventes IDs.")
         context_parts.append(
             "\nIMPORTANTE: Si la solicitud hace referencia a algo del historial (ej: 'sus facturas', 'de ese cliente'), usa ese contexto para identificar el cliente/factura correcta.")
 
