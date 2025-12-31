@@ -190,22 +190,29 @@ class Orchestrator:
 
     def _extract_ids_from_collected(self, collected: list) -> dict:
         """Extrae IDs de los datos recopilados en pasos anteriores."""
-        import re
         ids_found = {}
 
         for item in collected:
-            # Patrón: "Nombre (ID: 123)" o "ID: 123"
-            matches = re.findall(r'([A-Za-zÀ-ÿ\s\.,&\-]+?)\s*(?:\(ID:\s*|ID:\s*)(\d+)\)?', item)
+            # Patrón 1: "Nombre (ID: 123)" - formato general
+            matches = re.findall(r'([A-Za-zÀ-ÿ\s\.,&\-]+?)\s*\(ID:\s*(\d+)\)', item)
             for name, pid in matches:
                 clean_name = name.strip().rstrip(':').strip()
-                if clean_name and len(clean_name) > 2 and clean_name.lower() not in ['id', 'partner']:
+                # Filtrar nombres muy genéricos o vacíos
+                if clean_name and len(clean_name) > 2 and clean_name.lower() not in ['id', 'partner', 'cliente']:
                     ids_found[clean_name] = int(pid)
 
-            # Patrón alternativo: "- ID: 123" después de un nombre de cliente
-            # Buscar líneas como "**Cliente 1: Nombre**\n- ID: 123"
-            pattern_client = r'\*\*(?:Cliente \d+:\s*)?([A-Za-zÀ-ÿ\s\.,&\-]+?)\*\*\s*\n-\s*ID:\s*(\d+)'
-            matches_client = re.findall(pattern_client, item)
-            for name, pid in matches_client:
+            # Patrón 2: "**Cliente: Nombre (ID: 123)**" - formato markdown
+            pattern_markdown = r'\*\*Cliente:\s*(.+?)\s*\(ID:\s*(\d+)\)\*\*'
+            matches_md = re.findall(pattern_markdown, item)
+            for name, pid in matches_md:
+                clean_name = name.strip()
+                if clean_name:
+                    ids_found[clean_name] = int(pid)
+
+            # Patrón 3: "**Cliente N: Nombre**\n- ID: 123" - formato con ID en línea separada
+            pattern_multiline = r'\*\*(?:Cliente \d+:\s*)?([A-Za-zÀ-ÿ\s\.,&\-]+?)\*\*\s*\n-\s*ID:\s*(\d+)'
+            matches_ml = re.findall(pattern_multiline, item)
+            for name, pid in matches_ml:
                 clean_name = name.strip()
                 if clean_name:
                     ids_found[clean_name] = int(pid)

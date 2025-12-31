@@ -8,7 +8,7 @@ from .state import SubAgentState
 
 class BaseAgent:
     """Clase base para todos los sub-agentes"""
-    def __init__(self, prompt: str, tools: list, model: str = "mistral-small-latest"):
+    def __init__(self, prompt: str, tools: list, model: str = "mistral-large-latest"):
         self.MAX_MESSAGES = 20
         self.prompt = prompt
         self.tools = tools

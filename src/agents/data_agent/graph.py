@@ -9,5 +9,5 @@ class DataAgent(BaseAgent):
         super().__init__(
             prompt=PROMPT,
             tools=DATA_TOOLS,
-            model="mistral-small-latest"
+            model="mistral-large-latest"
         )
