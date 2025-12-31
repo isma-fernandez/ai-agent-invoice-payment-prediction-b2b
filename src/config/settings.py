@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings): 
@@ -13,10 +14,13 @@ class Settings(BaseSettings):
     # LangSmith
     LANGCHAIN_TRACING_V2: bool = False
     LANGCHAIN_API_KEY: str | None = None
-    LANGCHAIN_PROJECT: str = "tfg-financial-agent"
+    LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com" # Default usa ...
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 settings = Settings()
 
-
+if settings.LANGCHAIN_TRACING_V2 and settings.LANGCHAIN_API_KEY:
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = settings.LANGCHAIN_API_KEY
+    os.environ["LANGCHAIN_ENDPOINT"] = settings.LANGCHAIN_ENDPOINT

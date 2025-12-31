@@ -51,8 +51,6 @@ async def run_stream(agent, prompt, thread_id, status_placeholder, message_place
         kind = event.get("event")
         name = event.get("name", "")
 
-
-
         # Detectar inicio de nodo
         if kind == "on_chain_start":
             node_name = name.lower()
