@@ -41,7 +41,6 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-
 async def run_stream(agent, prompt, thread_id, status_placeholder, message_placeholder):
     """Ejecuta el agente en modo streaming mostrando solo estados relevantes."""
     final_response = ""
@@ -51,6 +50,8 @@ async def run_stream(agent, prompt, thread_id, status_placeholder, message_place
     async for event in agent.stream_request(prompt, thread_id):
         kind = event.get("event")
         name = event.get("name", "")
+
+
 
         # Detectar inicio de nodo
         if kind == "on_chain_start":
@@ -131,6 +132,7 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
             ))
 
             if final_response:
+                print(final_response)
                 # Eliminar marcadores de gráficos del texto
                 chart_matches = re.findall(r'CHART:([a-f0-9]+)', final_response)
                 clean_response = re.sub(r'CHART:[a-f0-9]+', '', final_response).strip()
@@ -140,7 +142,7 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
                 for chart_id in chart_matches:
                     fig = chart_generator.get_chart(chart_id)
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width='stretch')
                         chart_generator.clear_chart(chart_id)
 
                 st.session_state.messages.append({"role": "assistant", "content": clean_response})

@@ -1,3 +1,5 @@
+import re
+
 from langgraph.graph import StateGraph, START, END
 from langchain_mistralai import ChatMistralAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -193,11 +195,22 @@ class Orchestrator:
         messages = state.get("messages", [])
         history_str = self._extract_conversation_history(messages)
 
+        # Necesario para graficar correctamente los gráficos
+        chart_markers = []
+        for item in collected:
+            charts = re.findall(r'CHART:[a-f0-9]+', item)
+            chart_markers.extend(charts)
+
+        charts_instruction = ""
+        if chart_markers:
+            charts_instruction = f"\n\nINCLUYE OBLIGATORIAMENTE estos marcadores de gráfico AL FINAL de tu respuesta (en una línea separada, tal cual): {' '.join(chart_markers)}"
+
         system_instruction = (
-            "Eres un asistente financiero profesional. "
-            "Responde en español, sin emojis, de forma directa. "
-            "Adapta la extensión a la complejidad de la pregunta. "
-            "NO resumas datos numéricos. NO inventes datos."
+                "Eres un asistente financiero profesional. "
+                "Responde en español, sin emojis, de forma directa. "
+                "Adapta la extensión a la complejidad de la pregunta. "
+                "NO resumas datos numéricos. NO inventes datos."
+                + charts_instruction
         )
 
         if not collected:
@@ -215,13 +228,13 @@ class Orchestrator:
             )
 
             response = self.llm.invoke([
-                SystemMessage(
-                    content="Genera una respuesta clara y útil basada SOLO en la información proporcionada. NO inventes datos."),
+                SystemMessage(content=system_instruction),
                 HumanMessage(content=prompt)
             ])
             final_response = response.content
 
         return {"messages": [AIMessage(content=final_response)]}
+
 
     async def run(self, request: str, thread_id: str) -> str:
         config = {"configurable": {"thread_id": thread_id}}

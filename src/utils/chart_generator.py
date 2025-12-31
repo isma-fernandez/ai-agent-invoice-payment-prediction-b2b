@@ -18,11 +18,9 @@ class ChartGenerator:
             'palette': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
         }
 
-
     async def create_chart(self, chart_type: ChartType, title: str,
                            data: dict, show_values: bool = True) -> str:
         """Crea un gráfico y devuelve su ID."""
-
         chart_id = str(uuid.uuid4())[:8]
 
         if chart_type == ChartType.BAR:
@@ -38,13 +36,19 @@ class ChartGenerator:
         else:
             raise ValueError(f"Tipo de gráfico no soportado: {chart_type}")
 
+        # TEMA OSCURO
         fig.update_layout(
-            title=dict(text=title, font=dict(size=16)),
-            font=dict(family="Arial", size=12),
-            plot_bgcolor='white',
-            paper_bgcolor='white',
+            template='plotly_dark',  # ← Tema oscuro
+            title=dict(text=title, font=dict(size=16, color='#FAFAFA')),
+            font=dict(family="Arial", size=12, color='#FAFAFA'),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
             margin=dict(l=40, r=40, t=60, b=40),
-            height=400
+            height=400,
+            legend=dict(
+                bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#FAFAFA')
+            )
         )
 
         self.charts[chart_id] = fig

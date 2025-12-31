@@ -27,6 +27,7 @@ TOOL_MESSAGES = {
     "get_portfolio_summary": "Generando resumen de cartera...",
     "get_client_trend": "Analizando tendencia del cliente...",
     "get_deteriorating_clients": "Identificando clientes en deterioro...",
+    "generate_chart": "Generando gráfico...",
     # MemoryAgent tools
     "save_client_note": "Guardando nota del cliente...",
     "get_client_notes": "Recuperando notas del cliente...",

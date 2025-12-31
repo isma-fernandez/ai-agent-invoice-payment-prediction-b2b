@@ -160,6 +160,9 @@ class ChartType(str, Enum):
     PIE = "pie"
     DONUT = "donut"
 
+class GetAgingReportInput(BaseModel):
+    """Input para aging report."""
+    partner_id: Optional[int] = Field(default=None, description="ID del cliente (opcional). Si no se especifica, genera aging de toda la cartera.")
 
 class PredictHypotheticalInput(BaseModel):
     """Input para predecir riesgo de una factura hipotética."""

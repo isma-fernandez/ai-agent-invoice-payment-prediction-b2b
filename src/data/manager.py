@@ -535,20 +535,31 @@ class DataManager:
         results.sort(key=lambda x: x.due_date)
         return results[:limit]
 
-
-    async def get_aging_report(self) -> AgingReport:
+    async def get_aging_report(self, partner_id: int = None) -> AgingReport:
         """Genera informe de antigüedad de deuda (aging report)."""
-        raw_invoices = await self.data_retriever.get_all_overdue_invoices(min_days_overdue=1, limit=0)
+
+        cutoff = pd.Timestamp(self.cutoff)
+
+        if partner_id:
+            # Aging de un cliente específico
+            raw_invoices = await self.data_retriever.get_invoices_by_partner(partner_id)
+            # Filtrar solo vencidas no pagadas
+            raw_invoices = [
+                inv for inv in raw_invoices
+                if inv.get('payment_state') in ['not_paid', 'partial', False]
+                   and pd.Timestamp(inv['invoice_date_due']) < cutoff
+            ]
+        else:
+            # Aging global
+            raw_invoices = await self.data_retriever.get_all_overdue_invoices(min_days_overdue=1, limit=0)
 
         if not raw_invoices:
             return AgingReport(
                 total_overdue_eur=0,
                 total_overdue_count=0,
                 buckets=[],
-                generated_at=pd.Timestamp(self.cutoff).date()
+                generated_at=cutoff.date()
             )
-
-        cutoff = pd.Timestamp(self.cutoff)
 
         buckets_data = {
             '0-30': {'count': 0, 'amount': 0.0},
@@ -596,7 +607,7 @@ class DataManager:
             total_overdue_eur=round(total_amount, 2),
             total_overdue_count=sum(b.invoice_count for b in buckets),
             buckets=buckets,
-            generated_at=pd.Timestamp(self.cutoff).date()
+            generated_at=cutoff.date()
         )
 
 
