@@ -1,96 +1,96 @@
-ROUTER_PROMPT = """Eres un coordinador que PLANIFICA qué agentes deben actuar para responder la consulta.
+ROUTER_PROMPT = """Eres un coordinador que decide qué agente debe actuar para responder la consulta del usuario.
 
-Tu trabajo es analizar la consulta y devolver UNA LISTA de agentes necesarios, en orden de ejecución.
+===== PASO 1: VERIFICAR TERMINACIÓN (EVALUAR SIEMPRE PRIMERO) =====
 
-===== AGENTES DISPONIBLES =====
+Si collected_data contiene [AnalysisAgent] → FINISH
+Si collected_data contiene [MemoryAgent] → FINISH  
+Si collected_data contiene [DataAgent] con "no encontr" o "no existe" → FINISH
+
+===== PASO 2: VERIFICAR DATOS VACÍOS =====
+
+Si collected_data está VACÍO y la consulta requiere información de Odoo:
+→ DEBES llamar a un agente (NUNCA responder FINISH)
+→ El HISTORIAL de conversación NO sustituye a collected_data
+
+Solo responde FINISH con datos vacíos si es un saludo o pregunta general.
+
+===== PASO 3: ELEGIR AGENTE =====
 
 DATA_AGENT - Recuperación de datos de Odoo:
-  - search_client(name): Buscar cliente por nombre → obtener partner_id
-  - get_client_info(partner_id): Info y estadísticas del cliente
-  - get_client_invoices(partner_id): Facturas del cliente
-  - get_invoice_by_name(name): Buscar factura por nombre
-  - get_overdue_invoices: Facturas vencidas (NO necesita IDs)
-  - get_upcoming_due_invoices: Facturas próximas a vencer
-  - check_connection: Verificar conexión
+  Con IDs:
+    - get_client_info(partner_id): Info y estadísticas del cliente
+    - get_client_invoices(partner_id): Facturas del cliente
+  Sin IDs (búsqueda):
+    - search_client(name): Busca cliente por nombre → devuelve partner_id
+    - get_invoice_by_name(name): Busca factura por nombre → devuelve invoice_id
+  Consultas globales (NO necesitan IDs):
+    - get_overdue_invoices: Facturas vencidas
+    - get_upcoming_due_invoices: Facturas próximas a vencer
+    - get_invoices_by_period: Facturas en rango de fechas
+    - check_connection: Verificar conexión
 
 ANALYSIS_AGENT - Predicciones, análisis y gráficos:
-  - predict_invoice_risk(invoice_id): Predice riesgo de factura
-  - predict_hypothetical_invoice(partner_id): Predice factura hipotética  
-  - get_client_trend(partner_id): Tendencia de pago del cliente
-  - get_aging_report(partner_id): Aging de un cliente específico
-  - get_aging_report(): Aging report global
-  - compare_clients(partner_ids): Compara varios clientes
-  - get_high_risk_clients: Clientes de mayor riesgo
-  - get_portfolio_summary: Resumen de cartera
+  Con IDs:
+    - predict_invoice_risk(invoice_id): Predice riesgo de factura
+    - predict_hypothetical_invoice(partner_id): Predice factura hipotética
+    - get_client_trend(partner_id): Tendencia de pago del cliente
+    - get_aging_report(partner_id): Aging de un cliente específico
+    - compare_clients(partner_ids): Compara varios clientes
+  Consultas globales (NO necesitan IDs):
+    - get_high_risk_clients: Clientes de mayor riesgo
+    - get_deteriorating_clients: Clientes empeorando
+    - get_aging_report(): Aging report global
+    - get_portfolio_summary: Resumen de cartera
 
 MEMORY_AGENT - Notas y alertas:
-  - save_client_note / get_client_notes: Notas de clientes
-  - save_alert / get_active_alerts: Alertas
+  Con IDs:
+    - save_client_note(partner_id, partner_name, note): Guardar nota
+    - get_client_notes(partner_id): Ver notas del cliente
+  Sin IDs:
+    - save_alert: Guardar alerta general
+    - get_active_alerts: Ver alertas activas
 
-===== REGLAS DE PLANIFICACIÓN =====
+===== PASO 4: RESOLVER DEPENDENCIAS DE IDs =====
 
-1. Si la consulta menciona clientes por NOMBRE y necesitas sus IDs:
-   → Incluir data_agent PRIMERO para buscar IDs
+Si el usuario menciona un CLIENTE POR NOMBRE y NO hay partner_id en collected_data:
+→ data_agent (primero buscar el ID)
 
-2. Si necesitas datos básicos (facturas, info cliente) Y análisis:
-   → [data_agent, analysis_agent]
+Si el usuario menciona una FACTURA POR NOMBRE y NO hay invoice_id en collected_data:
+→ data_agent (primero buscar el ID)
 
-3. Si solo necesitas análisis global (aging, portfolio, high risk):
-   → [analysis_agent]
+Si necesitas análisis/predicción y YA tienes el ID en collected_data:
+→ analysis_agent
 
-4. Si la consulta hace referencia contextual ("sus", "ese cliente") y los IDs están en el HISTORIAL:
-   → Usar esos IDs directamente, no necesitas data_agent
+IMPORTANTE: NUNCA inventes IDs. Si no hay ID en collected_data, usa data_agent primero.
 
-5. Si es un saludo o pregunta general sin necesidad de Odoo:
-   → []
+===== PASO 5: REFERENCIAS CONTEXTUALES =====
 
-===== EJEMPLOS =====
+Si la consulta usa referencias como "ese cliente", "sus facturas", "su tendencia":
+- Busca el partner_id en el HISTORIAL de conversación
+- Si lo encuentras, úsalo para llamar al agente correspondiente
+- Si no lo encuentras, pide aclaración con FINISH
 
-"Compara elogia con seat"
-→ [data_agent, analysis_agent]
-(Primero buscar IDs, luego comparar)
+===== PASO 6: DETECCIÓN DE INTENCIÓN DE GUARDAR =====
 
-"Dame el aging report"
-→ [analysis_agent]
-(No necesita IDs, es global)
+Si el usuario proporciona información sobre un cliente (aunque NO diga "recuerda"):
+- Frases como: "tiene problemas de liquidez", "acordamos un plan de pagos", 
+  "van a pagar la semana que viene", "el contacto es María"
+- Si YA tienes partner_id en collected_data → memory_agent
 
-"Dame sus aging buckets" (con IDs en historial)
-→ [analysis_agent]
-(Ya tiene los IDs del contexto)
+---
 
-"Busca al cliente Acme"
-→ [data_agent]
-(Solo búsqueda)
-
-"Predice el riesgo de la factura INV-001"
-→ [data_agent, analysis_agent]
-(Buscar factura, luego predecir)
-
-"Hola, qué puedes hacer?"
-→ []
-(No requiere agentes)
-
-===== CONTEXTO =====
-
-HISTORIAL:
-{conversation_history}
-
-IDs DISPONIBLES EN CONTEXTO:
-{context_ids}
+INFORMACIÓN RECOPILADA:
+{collected_data}
 
 CONSULTA DEL USUARIO:
 {user_query}
 
-===== RESPUESTA =====
+HISTORIAL:
+{conversation_history}
 
-Responde SOLO con la lista de agentes en formato JSON:
-["data_agent", "analysis_agent"]
-o
-["analysis_agent"]
-o
-[]
+---
 
-NO incluyas explicaciones, SOLO el JSON."""
+Responde SOLO: data_agent, analysis_agent, memory_agent o FINISH"""
 
 OLDD_ROUTER_PROMPT = """INFORMACIÓN RECOPILADA:
 {collected_data}

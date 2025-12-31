@@ -1,3 +1,4 @@
+import json
 import re
 
 from langgraph.graph import StateGraph, START, END
@@ -14,9 +15,7 @@ from .prompts import ROUTER_PROMPT, FINAL_ANSWER_PROMPT
 
 
 class Orchestrator:
-    """Orquestador que coordina agentes y sintetiza respuestas."""
-    # TODO: Mencionado en el estado también pero habría que buscar otra solución para los bucles infinitos
-    MAX_ITERATIONS = 5
+    MAX_AGENTS_PER_PLAN = 8
     MAX_HISTORY_MESSAGES = 10
 
     def __init__(self):
@@ -36,28 +35,182 @@ class Orchestrator:
     def _build_graph(self):
         builder = StateGraph(AgentState)
 
-        # Nodos
         builder.add_node("router", self._router)
-        builder.add_node("data_agent", self._run_data_agent)
-        builder.add_node("analysis_agent", self._run_analysis_agent)
-        builder.add_node("memory_agent", self._run_memory_agent)
+        builder.add_node("executor", self._executor)
         builder.add_node("final_answer", self._generate_final_answer)
 
-        # Grafo
-        # Petición -> Router -> Agente -> Router -> ... -> Sintentizador -> Respuesta final
         builder.add_edge(START, "router")
-        builder.add_conditional_edges("router", self._route, {
-            "data_agent": "data_agent",
-            "analysis_agent": "analysis_agent",
-            "memory_agent": "memory_agent",
-            "final_answer": "final_answer"
+        builder.add_conditional_edges("router", self._should_execute, {
+            "execute": "executor",
+            "finish": "final_answer"
         })
-        builder.add_edge("data_agent", "router")
-        builder.add_edge("analysis_agent", "router")
-        builder.add_edge("memory_agent", "router")
+        builder.add_conditional_edges("executor", self._next_step, {
+            "continue": "executor",
+            "done": "final_answer"
+        })
         builder.add_edge("final_answer", END)
 
         return builder.compile(checkpointer=self.checkpointer)
+
+    def _extract_context_ids(self, messages: list) -> dict:
+        """Extrae partner_ids mencionados en el historial."""
+        ids_found = {}
+        for msg in messages:
+            if hasattr(msg, 'content') and msg.content:
+                content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                # Patrón: "Nombre (ID: 123)"
+                matches = re.findall(r'([A-Za-zÀ-ÿ\s\.,&]+?)\s*\(ID:\s*(\d+)\)', content)
+                for name, pid in matches:
+                    ids_found[name.strip()] = int(pid)
+        return ids_found
+
+    def _router(self, state: AgentState) -> dict:
+        """Planifica qué agentes ejecutar."""
+        user_query = state.get("user_query", "")
+        messages = state.get("messages", [])
+
+        history_str = self._extract_conversation_history(messages)
+        context_ids = self._extract_context_ids(messages)
+
+        context_ids_str = "\n".join([f"- {name}: partner_id = {pid}" for name, pid in context_ids.items()])
+        if not context_ids_str:
+            context_ids_str = "Ninguno disponible"
+
+        prompt = ROUTER_PROMPT.format(
+            conversation_history=history_str,
+            context_ids=context_ids_str,
+            user_query=user_query
+        )
+
+        response = self.llm.invoke([
+            SystemMessage(content="Responde solo con JSON válido."),
+            HumanMessage(content=prompt)
+        ])
+
+        # Parsear la respuesta JSON
+        try:
+            content = response.content.strip()
+            # Limpiar posibles backticks de markdown
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            agent_plan = json.loads(content)
+            if not isinstance(agent_plan, list):
+                agent_plan = []
+        except (json.JSONDecodeError, Exception):
+            agent_plan = []
+
+        # Limitar el plan
+        agent_plan = agent_plan[:self.MAX_AGENTS_PER_PLAN]
+
+        # DEBUG
+        print(f"\n{'=' * 50}")
+        print(f"ROUTER - Plan: {agent_plan}")
+        print(f"Query: {user_query}")
+        print(f"Context IDs: {context_ids}")
+        print(f"{'=' * 50}\n")
+
+        return {
+            "agent_plan": agent_plan,
+            "current_step": 0,
+            "collected_data": []
+        }
+
+    def _should_execute(self, state: AgentState) -> str:
+        """Decide si hay agentes que ejecutar."""
+        plan = state.get("agent_plan", [])
+        return "execute" if plan else "finish"
+
+    async def _executor(self, state: AgentState) -> dict:
+        """Ejecuta el agente actual del plan."""
+        plan = state.get("agent_plan", [])
+        step = state.get("current_step", 0)
+        collected = state.get("collected_data", []).copy()
+
+        if step >= len(plan):
+            return {"current_step": step}
+
+        agent_name = plan[step]
+        user_query = state.get("user_query", "")
+        messages = state.get("messages", [])
+
+        context = self._build_context_for_subagent(user_query, collected, messages)
+
+        if agent_name == "data_agent":
+            result = await self.data_agent.run([HumanMessage(content=context)])
+            response = self.data_agent.extract_final_response(result)
+            if response:
+                collected.append(f"[DataAgent]: {response}")
+
+        elif agent_name == "analysis_agent":
+            result = await self.analysis_agent.run([HumanMessage(content=context)])
+            response = self.analysis_agent.extract_final_response(result)
+            if response:
+                collected.append(f"[AnalysisAgent]: {response}")
+
+        elif agent_name == "memory_agent":
+            result = await self.memory_agent.run([HumanMessage(content=context)])
+            response = self.memory_agent.extract_final_response(result)
+            if response:
+                collected.append(f"[MemoryAgent]: {response}")
+
+        return {
+            "collected_data": collected,
+            "current_step": step + 1
+        }
+
+    def _next_step(self, state: AgentState) -> str:
+        """Decide si continuar con el siguiente agente o terminar."""
+        plan = state.get("agent_plan", [])
+        step = state.get("current_step", 0)
+        return "continue" if step < len(plan) else "done"
+
+    def _build_context_for_subagent(self, user_query: str, collected: list, messages: list) -> str:
+        """Contexto mínimo y limpio para el subagente."""
+        context_parts = []
+
+        # Combinar IDs del historial Y del collected_data actual
+        context_ids = self._extract_context_ids(messages)
+        collected_ids = self._extract_ids_from_collected(collected)
+
+        all_ids = {**context_ids, **collected_ids}
+
+        if all_ids:
+            context_parts.append("IDs DISPONIBLES (usar estos):")
+            for name, pid in all_ids.items():
+                clean_name = name.replace('"', '').replace("'", "").strip()
+                context_parts.append(f"- {clean_name}: partner_id = {pid}")
+            context_parts.append("")
+
+        # Consulta
+        context_parts.append(f"SOLICITUD: {user_query}")
+
+        context_parts.append("\nNO inventes IDs. Usa solo los proporcionados arriba.")
+
+        return "\n".join(context_parts)
+
+    def _extract_ids_from_collected(self, collected: list) -> dict:
+        """Extrae IDs de los datos recopilados en pasos anteriores."""
+        import re
+        ids_found = {}
+
+        for item in collected:
+            # Patrón: "Nombre (ID: 123)" o "ID: 123"
+            matches = re.findall(r'([A-Za-zÀ-ÿ\s\.,&\-]+?)\s*(?:\(ID:\s*|ID:\s*)(\d+)\)?', item)
+            for name, pid in matches:
+                clean_name = name.strip().rstrip(':').strip()
+                if clean_name and len(clean_name) > 2 and clean_name.lower() not in ['id', 'partner']:
+                    ids_found[clean_name] = int(pid)
+
+            # Patrón alternativo: "- ID: 123" después de un nombre de cliente
+            # Buscar líneas como "**Cliente 1: Nombre**\n- ID: 123"
+            pattern_client = r'\*\*(?:Cliente \d+:\s*)?([A-Za-zÀ-ÿ\s\.,&\-]+?)\*\*\s*\n-\s*ID:\s*(\d+)'
+            matches_client = re.findall(pattern_client, item)
+            for name, pid in matches_client:
+                clean_name = name.strip()
+                if clean_name:
+                    ids_found[clean_name] = int(pid)
+
+        return ids_found
 
     def _extract_conversation_history(self, messages: list) -> str:
         """Extrae el historial de conversación de los mensajes."""
@@ -80,122 +233,6 @@ class Orchestrator:
                 lines.append(f"Asistente: {content}")
 
         return "\n".join(lines) if lines else "Sin historial previo."
-
-    def _router(self, state: AgentState) -> dict:
-        """Decide qué agente usar en base a la información recopilada."""
-        curr_info = state.get("collected_data", [])
-        user_query = state.get("user_query", "")
-        iterations = state.get("iterations", 0)
-        messages = state.get("messages", [])
-
-        # DEBUG
-        print(f"\n{'=' * 50}")
-        print(f"ROUTER - Iteración {iterations}")
-        print(f"Query: {user_query}")
-        print(f"Collected data: {curr_info}")
-        print(f"Messages count: {len(messages)}")
-        print(f"{'=' * 50}\n")
-
-        # Evitar bucles infinitos
-        # TODO: Mencionado en varios sitios, se debe buscar otra solución
-        if iterations >= self.MAX_ITERATIONS:
-            return {"next_agent": None, "iterations": iterations + 1}
-
-        # Formateamos los datos existentes
-        collected_str = "\n".join(curr_info) if curr_info else "Ninguna información recopilada aún."
-        history_str = self._extract_conversation_history(messages)
-
-        prompt = ROUTER_PROMPT.format(
-            conversation_history=history_str,
-            collected_data=collected_str,
-            user_query=user_query
-        )
-
-        # TODO: SystemMessage redundante con el prompt, sacado de la antigua arquitectura
-        response = self.llm.invoke([
-            SystemMessage(
-                content="Eres un router que decide qué agente usar. "
-                        "Responde solo con el nombre del agente o FINISH."),
-            HumanMessage(content=prompt)
-        ])
-
-        decision = response.content.strip().lower()
-
-        if "data_agent" in decision or "data" in decision:
-            next_agent = "data_agent"
-        elif "analysis_agent" in decision or "analysis" in decision:
-            next_agent = "analysis_agent"
-        elif "memory_agent" in decision or "memory" in decision:
-            next_agent = "memory_agent"
-        else:
-            next_agent = None
-
-        return {"next_agent": next_agent, "iterations": iterations + 1}
-
-    def _route(self, state: AgentState) -> str:
-        next_agent = state.get("next_agent")
-        if next_agent:
-            return next_agent
-        return "final_answer"
-
-    # TODO: Código redundante
-    async def _run_data_agent(self, state: AgentState) -> dict:
-        user_query = state.get("user_query", "")
-        collected = state.get("collected_data", []).copy()
-        messages = state.get("messages", [])
-        context = self._build_context_for_subagent(user_query, collected, messages)
-
-        result = await self.data_agent.run([HumanMessage(content=context)])
-        response = self.data_agent.extract_final_response(result)
-        if response:
-            collected.append(f"[DataAgent]: {response}")
-
-        return {"collected_data": collected}
-
-    async def _run_analysis_agent(self, state: AgentState) -> dict:
-        user_query = state.get("user_query", "")
-        collected = state.get("collected_data", []).copy()
-        messages = state.get("messages", [])
-        context = self._build_context_for_subagent(user_query, collected, messages)
-
-        result = await self.analysis_agent.run([HumanMessage(content=context)])
-        response = self.analysis_agent.extract_final_response(result)
-        if response:
-            collected.append(f"[AnalysisAgent]: {response}")
-
-        return {"collected_data": collected}
-
-    async def _run_memory_agent(self, state: AgentState) -> dict:
-        user_query = state.get("user_query", "")
-        collected = state.get("collected_data", []).copy()
-        messages = state.get("messages", [])
-        context = self._build_context_for_subagent(user_query, collected, messages)
-
-        result = await self.memory_agent.run([HumanMessage(content=context)])
-        response = self.memory_agent.extract_final_response(result)
-        if response:
-            collected.append(f"[MemoryAgent]: {response}")
-
-        return {"collected_data": collected}
-
-    # TODO: Valorar simplificar método con el del orquestador
-    def _build_context_for_subagent(self, user_query: str, collected: list, messages: list) -> str:
-        context_parts = []
-        history = self._extract_conversation_history(messages)
-        if history != "Sin historial previo.":
-            context_parts.append(f"HISTORIAL DE CONVERSACIÓN:\n{history}\n")
-        context_parts.append(f"SOLICITUD ACTUAL: {user_query}")
-
-        if collected:
-            context_parts.append("\nINFORMACIÓN YA RECOPILADA:")
-            for item in collected:
-                context_parts.append(item)
-            context_parts.append(
-                "\nIMPORTANTE: Usa los IDs (partner_id, invoice_id) de la información recopilada. NO inventes IDs.")
-        context_parts.append(
-            "\nIMPORTANTE: Si la solicitud hace referencia a algo del historial (ej: 'sus facturas', 'de ese cliente'), usa ese contexto para identificar el cliente/factura correcta.")
-
-        return "\n".join(context_parts)
 
     def _generate_final_answer(self, state: AgentState) -> dict:
         collected = state.get("collected_data", [])
@@ -249,15 +286,14 @@ class Orchestrator:
 
         return {"messages": [AIMessage(content=final_response)]}
 
-
     async def run(self, request: str, thread_id: str) -> str:
         config = {"configurable": {"thread_id": thread_id}}
         initial_state = {
             "messages": [HumanMessage(content=request)],
             "user_query": request,
-            "next_agent": None,
-            "collected_data": [],
-            "iterations": 0
+            "agent_plan": [],
+            "current_step": 0,
+            "collected_data": []
         }
         final_state = await self.graph.ainvoke(initial_state, config=config)
 
@@ -272,9 +308,9 @@ class Orchestrator:
         initial_state = {
             "messages": [HumanMessage(content=request)],
             "user_query": request,
-            "next_agent": None,
-            "collected_data": [],
-            "iterations": 0
+            "agent_plan": [],
+            "current_step": 0,
+            "collected_data": []
         }
 
         async for event in self.graph.astream_events(initial_state, config=config):

@@ -138,7 +138,7 @@ class GetClientInfoInput(BaseModel):
 class GetClientInvoicesInfoInput(BaseModel):
     """Input para obtener información de facturas de un cliente."""
     partner_id: int = Field(description="ID del cliente en el sistema")
-    limit: int = Field(default=5, description="Máximo de facturas a devolver")
+    limit: int = Field(default=10, description="Máximo de facturas a devolver")
     only_unpaid: bool = Field(default=False, description="Solo facturas pendientes de pago")
     paid_only: bool = Field(default=False, description="Solo facturas pagadas")
 
@@ -173,7 +173,7 @@ class PredictHypotheticalInput(BaseModel):
 
 class GetOverdueInvoicesInput(BaseModel):
     """Input para obtener facturas vencidas."""
-    limit: int = Field(default=10, description="Máximo de facturas a devolver")
+    limit: int = Field(default=None, description="Máximo de facturas a devolver")
     min_days_overdue: int = Field(default=1, description="Mínimo de días de vencimiento")
 
 
@@ -191,7 +191,7 @@ class GetUpcomingDueInvoicesInput(BaseModel):
 class GetClientTrendInput(BaseModel):
     """Input para tendencia de un cliente."""
     partner_id: int = Field(description="ID del cliente")
-    recent_months: int = Field(default=6, description="Meses a considerar como período reciente")
+    recent_months: int = Field(default=12, description="Meses a considerar como período reciente")
 
 
 class GetInvoicesByPeriodInput(BaseModel):
@@ -204,7 +204,7 @@ class GetInvoicesByPeriodInput(BaseModel):
 
 class GetDeterioratingClientsInput(BaseModel):
     """Input para clientes que empeoran."""
-    limit: int = Field(default=10, description="Máximo de clientes a devolver")
+    limit: int = Field(default=None, description="Máximo de clientes a devolver")
     min_invoices: int = Field(default=5, description="Mínimo de facturas históricas para considerar")
 
 

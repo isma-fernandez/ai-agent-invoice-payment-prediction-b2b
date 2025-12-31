@@ -8,7 +8,7 @@ class DataRetriever:
     def __init__(self, odoo_connection: OdooConnection, cutoff_date: str = None):
         self.odoo_connection = odoo_connection
         self.cutoff_date = cutoff_date
-        self.max_concurrent_requests = 10
+        self.max_concurrent_requests = 20
 
     async def _fetch_batch(self, model: str, domain: list, fields: list, offset: int) -> list:
         return await self.odoo_connection.search_read(model, domain, fields, BATCH_SIZE, offset)
