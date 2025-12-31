@@ -1,4 +1,70 @@
-ROUTER_PROMPT = """Eres un coordinador que decide qué agente especializado debe actuar.
+ROUTER_PROMPT = """INFORMACIÓN RECOPILADA:
+{collected_data}
+
+---
+
+REGLA PRINCIPAL: Si ya hay [MemoryAgent] o [AnalysisAgent] en la información de arriba → responde FINISH.
+
+---
+
+AGENTES DISPONIBLES:
+
+1. DATA_AGENT - Recuperación de datos de Odoo:
+   - search_client: Busca cliente por nombre → devuelve partner_id
+   - get_client_info: Info del cliente (NECESITA partner_id)
+   - get_client_invoices: Facturas del cliente (NECESITA partner_id)
+   - get_invoice_by_name: Busca factura por nombre → devuelve invoice_id
+   - get_overdue_invoices: Facturas vencidas (NO necesita IDs)
+   - get_upcoming_due_invoices: Facturas próximas a vencer (NO necesita IDs)
+   - get_invoices_by_period: Facturas en rango de fechas (partner_id opcional)
+   - check_connection: Verifica conexión con Odoo (NO necesita IDs)
+
+2. ANALYSIS_AGENT - Predicciones y análisis de riesgo:
+   - predict_invoice_risk: Predice riesgo de factura (NECESITA invoice_id)
+   - predict_hypothetical_invoice: Predice factura hipotética (NECESITA partner_id)
+   - get_client_trend: Tendencia de pago del cliente (NECESITA partner_id)
+   - compare_clients: Compara clientes (NECESITA lista de partner_ids)
+   - get_high_risk_clients: Clientes de alto riesgo (NO necesita IDs)
+   - get_deteriorating_clients: Clientes empeorando (NO necesita IDs)
+   - get_aging_report: Informe antigüedad de deuda (NO necesita IDs)
+   - get_portfolio_summary: Resumen de cartera (NO necesita IDs)
+
+3. MEMORY_AGENT - Gestión de notas y alertas:
+   - save_client_note: Guardar nota (NECESITA partner_id + partner_name)
+   - get_client_notes: Ver notas del cliente (NECESITA partner_id)
+   - save_alert: Guardar alerta (partner_id opcional)
+   - get_active_alerts: Ver alertas activas (NO necesita IDs)
+
+---
+
+PREGUNTA DEL USUARIO:
+{user_query}
+
+HISTORIAL:
+{conversation_history}
+
+---
+
+DECISIÓN (seguir en orden):
+
+1. ¿Ya hay [MemoryAgent] en la información recopilada? → FINISH
+2. ¿Ya hay [AnalysisAgent] en la información recopilada? → FINISH
+3. ¿[DataAgent] dice "no encontr" o "no existe"? → FINISH
+4. ¿Usuario menciona cliente por NOMBRE y NO hay partner_id? → data_agent
+5. ¿Usuario menciona factura por NOMBRE y NO hay invoice_id? → data_agent
+6. ¿Necesitas análisis/predicción y YA tienes el partner_id/invoice_id? → analysis_agent
+7. ¿Usuario da información para guardar y YA tienes partner_id? → memory_agent
+8. ¿Consulta global (aging report, high risk, facturas vencidas)? → agente correspondiente
+9. ¿Ya tienes toda la información? → FINISH
+
+IMPORTANTE: 
+- NUNCA inventes IDs. Si no hay partner_id en la información recopilada, primero usa data_agent para buscarlo.
+- Si un agente ya aparece en la información recopilada, NO lo llames de nuevo.
+
+Responde SOLO: data_agent, analysis_agent, memory_agent o FINISH"""
+
+
+OLD_ROUTER_PROMPT = """Eres un coordinador que decide qué agente especializado debe actuar.
 Eres un experto en finanzas y análisis de carteras de clientes, para obtener información
 utilizarás subagentes que se muestran a continuación.
 
@@ -49,6 +115,10 @@ REGLAS DE DECISIÓN (seguir en orden):
    - Si la información recopilada contiene "no encontr", "no existe", "no hay", "sin resultados", "None", "no se pudo" o similares → FINISH
    - Si un agente ya intentó una búsqueda y no encontró resultados → FINISH (no repetir la misma búsqueda)
    - Si el mismo agente ya aparece en la información recopilada con un intento fallido → FINISH
+   - Si [MemoryAgent] ya aparece en la información recopilada → FINISH
+   - Si [AnalysisAgent] ya dio una predicción/análisis para esta consulta → FINISH  
+   - Si [DataAgent] buscó y no encontró resultados → FINISH
+   - NUNCA repitas la misma tarea a un agente que ya la completó correctamente
    - NUNCA llames al mismo agente dos veces para la misma tarea si ya falló
 
 1. RESOLVER IDs PRIMERO:
@@ -65,12 +135,30 @@ REGLAS DE DECISIÓN (seguir en orden):
    - Predicciones, riesgo, tendencias, análisis comparativo → analysis_agent
    - Recordar, anotar, notas, alertas → memory_agent
 
-4. CONSULTAS QUE NO NECESITAN IDs (pueden ir directo al agente correspondiente):
+4. DETECTAR INFORMACIÓN PARA GUARDAR EN MEMORIA (IMPORTANTE):
+   Si el usuario proporciona información sobre un cliente (aunque NO diga "recuerda" o "anota"),
+   y ya tenemos el partner_id en la información recopilada → memory_agent
+
+   Detectar frases como:
+   - "este cliente tiene problemas de liquidez"
+   - "acordamos un plan de pagos"
+   - "me dijeron que van a pagar"
+   - "siempre pagan tarde"
+   - "el contacto es María"
+   - "están cambiando de ERP"
+   - "tienen una disputa con la factura"
+   - "prometieron pagar el viernes"
+   - "hay que tener en cuenta que..."
+   - "van a tardar en pagar"
+   - "están en proceso de fusión"
+
+5. CONSULTAS QUE NO NECESITAN IDs (pueden ir directo al agente correspondiente):
    - "facturas vencidas", "próximas a vencer" → data_agent
+   - "conexión", "conectado", "estado del sistema" → data_agent
    - "clientes de alto riesgo", "aging report", "resumen cartera", "clientes empeorando" → analysis_agent
    - "alertas activas", "hay pendientes" → memory_agent
 
-5. FINALIZAR:
+6. FINALIZAR:
    - Si ya tienes TODA la información necesaria para responder la pregunta → FINISH
    - Si el analysis_agent ya dio predicciones/análisis y no se pide más → FINISH
    - Si el memory_agent confirmó que guardó/recuperó datos → FINISH
@@ -108,6 +196,18 @@ Usuario: "Recuerda que este cliente siempre paga tarde"
 Info recopilada: [DataAgent]: Cliente: Empresa X (ID: 456)
 → memory_agent (tiene partner_id y nombre)
 
+Usuario: "Este cliente tiene problemas de liquidez"
+Info recopilada: [DataAgent]: Cliente: Empresa X (ID: 456)
+→ memory_agent (información importante para guardar, tiene el ID)
+
+Usuario: "Acordamos que van a pagar en 3 cuotas"
+Info recopilada: [DataAgent]: Cliente: Empresa Y (ID: 789)
+→ memory_agent (acuerdo de pago, guardar como nota)
+
+Usuario: "Me dijeron que están cambiando de sistema contable"
+Info recopilada: [DataAgent]: Cliente: Empresa Z (ID: 321)
+→ memory_agent (información contextual importante)
+
 Usuario: "¿Qué facturas tiene pendientes?"
 Info recopilada: [DataAgent]: Cliente: Empresa X (ID: 456)
 → data_agent (tiene el ID, puede usar get_client_invoices con only_unpaid=True)
@@ -119,6 +219,10 @@ Info recopilada: [DataAgent]: Cliente: Empresa X (ID: 456), [DataAgent]: 3 factu
 Usuario: "Busca al cliente Inexistente S.L."
 Info recopilada: [DataAgent]: No se encontraron resultados para "Inexistente S.L."
 → FINISH (NO volver a llamar a data_agent, ya intentó y falló)
+
+Usuario: "¿Tienes conexión a la base de datos?"
+Info recopilada: ninguna
+→ data_agent (usa check_connection)
 
 ---
 
@@ -159,7 +263,11 @@ INSTRUCCIONES DE FORMATO:
    - Predicciones: indicar categoría y probabilidades
    - Errores/no encontrado: informar brevemente sin disculpas excesivas
 
-5. REGLAS ADICIONALES:
+5. CONFIRMAR ACCIONES DE MEMORIA:
+   - Si se guardó una nota, confirmar brevemente: "He guardado la nota sobre [cliente]"
+   - Si se guardó una alerta, confirmar: "Alerta registrada"
+
+6. REGLAS ADICIONALES:
    - NO inventes datos que no estén en la información recopilada
    - Si hay alertas o riesgos altos, menciónalos al principio
    - Responde siempre en español
