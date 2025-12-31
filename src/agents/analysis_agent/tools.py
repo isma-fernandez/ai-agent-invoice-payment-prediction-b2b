@@ -6,17 +6,6 @@ from src.data.models import (
 )
 from src.agents.shared import get_data_manager
 
-# Mensajes para chat.py
-TOOL_MESSAGES = {
-    "check_connection": "Verificando conexión con Odoo...",
-    "search_client": "Buscando cliente...",
-    "get_client_info": "Obteniendo información del cliente...",
-    "get_client_invoices": "Recuperando facturas del cliente...",
-    "get_invoice_by_name": "Buscando factura...",
-    "get_overdue_invoices": "Obteniendo facturas vencidas...",
-    "get_upcoming_due_invoices": "Buscando facturas próximas a vencer...",
-    "get_invoices_by_period": "Recuperando facturas del período...",
-}
 
 @tool(args_schema=PredictInvoiceInput)
 async def predict_invoice_risk(invoice_id: int) -> PredictionResult | None:
