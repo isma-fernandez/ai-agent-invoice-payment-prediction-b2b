@@ -45,6 +45,9 @@ class DataManager:
         self._model: Optional[Any] = None
         self._transformations: Dict[str, Any] = {}
 
+    def is_model_loaded(self):
+        return self._model is not None
+
     async def connect(self) -> None:
         """Establece la conexión con Odoo."""
         self.odoo_connection = OdooConnection()
