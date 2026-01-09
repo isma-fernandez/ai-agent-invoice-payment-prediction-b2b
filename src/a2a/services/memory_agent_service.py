@@ -1,13 +1,16 @@
 # src/a2a/services/memory_agent_service.py
 import uvicorn
-from a2a.server.apps.rest import A2ARESTFastAPIApplication
+from a2a.server.apps import A2AFastAPIApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.types import AgentCard, AgentCapabilities, AgentSkill
+from a2a.server.tasks import InMemoryTaskStore
 from src.agents.memory_agent import MemoryAgent
 from src.a2a.base import BaseAgentExecutor
 from src.agents.store import MemoryStore
 from src.agents.shared import set_memory_store
 from src.config.settings import settings
+
+_task_store = InMemoryTaskStore()
 
 #TODO: A lo mejor mover esto a el archivo de agentes
 agent_card = AgentCard(
@@ -62,9 +65,12 @@ async def init_resources():
         set_memory_store(_memory_store)
 
 executor = BaseAgentExecutor(lambda: MemoryAgent())
-request_handler = DefaultRequestHandler(agent_executor=executor)
+request_handler = DefaultRequestHandler(
+    agent_executor=executor, 
+    task_store=_task_store
+)
 
-a2a_app = A2ARESTFastAPIApplication(
+a2a_app = A2AFastAPIApplication(
     agent_card=agent_card,
     http_handler=request_handler
 )

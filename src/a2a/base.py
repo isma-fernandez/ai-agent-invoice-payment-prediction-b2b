@@ -45,7 +45,7 @@ class BaseAgentExecutor(AgentExecutor):
                 parts=[Part(root=TextPart(text="Error: No hay contenido de texto en el mensaje"))],
                 kind="message"
             )
-            await event_queue.send_message(response)
+            await event_queue.enqueue_event(response)
             return
         
         # El agente ejecuta la tarea
@@ -59,6 +59,6 @@ class BaseAgentExecutor(AgentExecutor):
             parts=[Part(root=TextPart(text=response_text))],
             kind="message"
         )
-        await event_queue.send_message(response)
+        await event_queue.enqueue_event(response)
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         pass

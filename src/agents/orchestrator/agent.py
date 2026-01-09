@@ -11,7 +11,7 @@ class FinancialAgent:
         self._orchestrator = None
 
 
-    async def initialize(self, cutoff_date: str = None, model_path: str = None):
+    async def initialize(self, cutoff_date: str = None, model_path: str = "models/invoice_risk_model.pkl"):
         """Inicializa conexión a Odoo, modelo de predicción y agentes."""
         if self._initialized:
             return
@@ -19,8 +19,7 @@ class FinancialAgent:
         dm = DataManager(cutoff_date=cutoff_date)
         await dm.connect()
         if model_path:
-            #TODO: Desactivado temporalmente
-            #dm.load_model(model_path)
+            dm.load_model(model_path)
             ...
         set_data_manager(dm)
 

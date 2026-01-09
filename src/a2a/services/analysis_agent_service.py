@@ -1,12 +1,15 @@
 import uvicorn
-from a2a.server.apps.rest import A2ARESTFastAPIApplication
+from a2a.server.apps import A2AFastAPIApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.types import AgentCard, AgentCapabilities, AgentSkill
+from a2a.server.tasks import InMemoryTaskStore
 from src.agents.analysis_agent import AnalysisAgent
 from src.a2a.base import BaseAgentExecutor
 from src.data.manager import DataManager
 from src.agents.shared import set_data_manager
 from src.config.settings import settings
+
+_task_store = InMemoryTaskStore()
 
 #TODO: A lo mejor mover esto a el archivo de agentes
 agent_card = AgentCard(
@@ -89,11 +92,16 @@ async def init_resources():
         _data_manager = DataManager()
         await _data_manager.connect()
         set_data_manager(_data_manager)
+        _data_manager.load_model("models/late_invoice_payment_classification.pkl")
+    
 
 executor = BaseAgentExecutor(lambda: AnalysisAgent())
-request_handler = DefaultRequestHandler(agent_executor=executor)
+request_handler = DefaultRequestHandler(
+    agent_executor=executor, 
+    task_store=_task_store
+)
 
-a2a_app = A2ARESTFastAPIApplication(
+a2a_app = A2AFastAPIApplication(
     agent_card=agent_card,
     http_handler=request_handler
 )
