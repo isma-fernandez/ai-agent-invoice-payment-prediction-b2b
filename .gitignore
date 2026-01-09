@@ -1,5 +1,5 @@
 # No eliminar !!!!!!!!!!
-config/settings.env
+src/config/settings.env
 fields.txt
 mcp_odoo/
 old_data/*
