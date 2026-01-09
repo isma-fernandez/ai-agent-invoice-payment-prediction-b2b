@@ -22,42 +22,50 @@ agent_card = AgentCard(
         AgentSkill(
             id="search_client",
             name="search_client",
-            description="Buscar cliente por nombre y obtener partner_id"
+            description="Buscar cliente por nombre y obtener partner_id",
+            tags=["client", "search", "odoo"]
         ),
         AgentSkill(
             id="get_client_info",
             name="get_client_info",
-            description="Obtener información y estadísticas del cliente"
+            description="Obtener información y estadísticas del cliente",
+            tags=["client", "information", "statistics", "odoo"]
         ),
         AgentSkill(
             id="get_client_invoices",
             name="get_client_invoices",
-            description="Obtener facturas del cliente"
+            description="Obtener facturas del cliente",
+            tags=["client", "invoice", "odoo"]
         ),
         AgentSkill(
             id="get_invoice_by_name",
             name="get_invoice_by_name",
-            description="Buscar factura por nombre"
+            description="Buscar factura por nombre",
+            tags=["invoice", "search", "odoo"]
         ),
         AgentSkill(
             id="get_overdue_invoices",
             name="get_overdue_invoices",
-            description="Obtener facturas vencidas"
+            description="Obtener facturas vencidas",
+            tags=["invoice", "overdue", "odoo"]
         ),
         AgentSkill(
             id="get_upcoming_due_invoices",
             name="get_upcoming_due_invoices",
-            description="Obtener facturas próximas a vencer"
+            description="Obtener facturas próximas a vencer",
+            tags=["invoice", "upcoming", "due", "odoo"]
         ),
         AgentSkill(
             id="get_invoices_by_period",
             name="get_invoices_by_period",
-            description="Obtener facturas por período de fechas"
+            description="Obtener facturas por período de fechas",
+            tags=["invoice", "period", "dates", "odoo"]
         ),
         AgentSkill(
             id="check_connection",
             name="check_connection",
-            description="Verificar conexión con Odoo"
+            description="Verificar conexión con Odoo",
+            tags=["connection", "odoo", "verification"]
         ),
     ]
 )

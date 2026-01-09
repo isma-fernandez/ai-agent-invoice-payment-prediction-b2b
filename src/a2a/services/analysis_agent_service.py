@@ -22,47 +22,56 @@ agent_card = AgentCard(
         AgentSkill(
             id="predict_invoice_risk",
             name="predict_invoice_risk",
-            description="Predice el riesgo de impago de una factura existente"
+            description="Predice el riesgo de impago de una factura existente",
+            tags=["prediction", "risk", "invoice", "payment"]
         ),
         AgentSkill(
             id="predict_hypothetical_invoice",
             name="predict_hypothetical_invoice",
-            description="Predice el riesgo de una factura hipotética para un cliente"
+            description="Predice el riesgo de una factura hipotética para un cliente",
+            tags=["prediction", "risk", "hypothetical", "invoice"]
         ),
         AgentSkill(
             id="get_high_risk_clients",
             name="get_high_risk_clients",
-            description="Obtiene los clientes con mayor riesgo de impago"
+            description="Obtiene los clientes con mayor riesgo de impago",
+            tags=["risk", "client", "ranking", "analysis"]
         ),
         AgentSkill(
             id="compare_clients",
             name="compare_clients",
-            description="Compara varios clientes en términos de riesgo y comportamiento de pago"
+            description="Compara varios clientes en términos de riesgo y comportamiento de pago",
+            tags=["comparison", "client", "risk", "behavior"]
         ),
         AgentSkill(
             id="get_aging_report",
             name="get_aging_report",
-            description="Genera un informe de antigüedad de deuda (global o por cliente)"
+            description="Genera un informe de antigüedad de deuda (global o por cliente)",
+            tags=["aging", "debt", "report", "analysis"]
         ),
         AgentSkill(
             id="get_portfolio_summary",
             name="get_portfolio_summary",
-            description="Obtiene un resumen de la cartera completa con métricas agregadas"
+            description="Obtiene un resumen de la cartera completa con métricas agregadas",
+            tags=["portfolio", "summary", "metrics", "analysis"]
         ),
         AgentSkill(
             id="get_client_trend",
             name="get_client_trend",
-            description="Analiza la tendencia de pago de un cliente a lo largo del tiempo"
+            description="Analiza la tendencia de pago de un cliente a lo largo del tiempo",
+            tags=["trend", "client", "evolution", "analysis"]
         ),
         AgentSkill(
             id="get_deteriorating_clients",
             name="get_deteriorating_clients",
-            description="Identifica clientes cuyo comportamiento de pago está empeorando"
+            description="Identifica clientes cuyo comportamiento de pago está empeorando",
+            tags=["deterioration", "client", "alert", "analysis"]
         ),
         AgentSkill(
             id="generate_chart",
             name="generate_chart",
-            description="Genera gráficos visuales para mostrar datos (barras, líneas, donut, etc.)"
+            description="Genera gráficos visuales para mostrar datos (barras, líneas, donut, etc.)",
+            tags=["chart", "visualization", "graph", "data"]
         ),
     ]
 )
