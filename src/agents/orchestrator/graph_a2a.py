@@ -7,9 +7,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from src.agents.state import AgentState
 from src.config.settings import settings
-
 from src.a2a.client import A2AAgentClient
-from src.agents.memory_agent import MemoryAgent
 from .prompts import ROUTER_PROMPT, FINAL_ANSWER_PROMPT
 
 
@@ -27,6 +25,8 @@ class Orchestrator:
         self.data_agent_client = A2AAgentClient(settings.A2A_DATA_AGENT_URL)
         self.analysis_agent_client = A2AAgentClient(settings.A2A_ANALYSIS_AGENT_URL)
         self.memory_agent_client = A2AAgentClient(settings.A2A_MEMORY_AGENT_URL)
+        self.checkpointer = MemorySaver()
+        self.graph = self._build_graph()
 
     def _build_graph(self):
         builder = StateGraph(AgentState)
