@@ -60,3 +60,5 @@ class BaseAgentExecutor(AgentExecutor):
             kind="message"
         )
         await event_queue.send_message(response)
+    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        pass
