@@ -6,13 +6,14 @@ from src.agents.data_agent import DataAgent
 from src.a2a.base import BaseAgentExecutor
 from src.data.manager import DataManager
 from src.agents.shared import set_data_manager
+from src.config.settings import settings
 
 #TODO: A lo mejor mover esto a el archivo de agentes
 agent_card = AgentCard(
     name="data_agent",
     description="Agente especializado en recuperación de datos del sistema Odoo ERP",
     version="1.0.0",
-    url="http://localhost:8001",
+    url=settings.A2A_DATA_AGENT_URL,
     default_input_modes=["text/plain"],
     default_output_modes=["text/plain"],
     capabilities=AgentCapabilities(

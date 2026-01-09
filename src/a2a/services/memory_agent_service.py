@@ -7,13 +7,14 @@ from src.agents.memory_agent import MemoryAgent
 from src.a2a.base import BaseAgentExecutor
 from src.agents.store import MemoryStore
 from src.agents.shared import set_memory_store
+from src.config.settings import settings
 
 #TODO: A lo mejor mover esto a el archivo de agentes
 agent_card = AgentCard(
     name="memory_agent",
     description="Agente especializado en gestión de memoria persistente (notas y alertas)",
     version="1.0.0",
-    url="http://localhost:8003",
+    url=settings.A2A_MEMORY_AGENT_URL,
     default_input_modes=["text/plain"],
     default_output_modes=["text/plain"],
     capabilities=AgentCapabilities(
