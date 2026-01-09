@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     LANGCHAIN_API_KEY: str | None = None
     LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com" # Default usa ...
 
+    # A2A
+    A2A_DATA_AGENT_URL: str = "http://localhost:8001"
+    A2A_ANALYSIS_AGENT_URL: str = "http://localhost:8002"
+    A2A_MEMORY_AGENT_URL: str = "http://localhost:8003"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 settings = Settings()
