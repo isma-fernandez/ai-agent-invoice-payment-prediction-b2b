@@ -1,5 +1,5 @@
-import asyncio
 from fastmcp import FastMCP
+import base64
 from src.data.manager import DataManager
 from src.utils.chart_generator import chart_generator
 from src.data.models import ChartType
@@ -191,7 +191,19 @@ async def generate_chart(chart_type: str, title: str, data: dict, show_values: b
         data=data,
         show_values=show_values
     )
-    return f"CHART:{chart_id}"
+    # Fix para que el gráfico se pueda renderizar sistemas externos
+    fig = chart_generator.get_chart(chart_id)
+    if fig:
+        img_bytes = fig.to_image(format="png", width=800, height=400)
+        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+    else:
+        img_base64 = None
+    
+    return {
+        "chart_id": chart_id,
+        "image_base64": img_base64,
+        "marker": f"CHART:{chart_id}" # Compatibilidad con el sistema interno actual
+    }
 
 if __name__ == "__main__":
     mcp.run()
