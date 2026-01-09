@@ -1,6 +1,6 @@
 # src/a2a/base.py
 from a2a.server.agent_execution import AgentExecutor
-from a2a.server.request_handlers import RequestContext
+from a2a.server.agent_execution.context import RequestContext
 from a2a.server.events import EventQueue
 from a2a.types import Message, Part, TextPart
 from langchain_core.messages import HumanMessage
