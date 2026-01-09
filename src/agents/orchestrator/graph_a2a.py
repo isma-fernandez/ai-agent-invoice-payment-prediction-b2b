@@ -5,6 +5,7 @@ from langgraph.graph import StateGraph, START, END
 from langchain_mistralai import ChatMistralAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
+from src.agents.state import AgentState
 from src.config.settings import settings
 
 from src.a2a.client import A2AAgentClient
@@ -22,13 +23,10 @@ class Orchestrator:
             temperature=0,
             api_key=settings.API_MISTRAL_KEY
         )
-        # TODO: Esto en vez de crearse aquí, se tendrían que comunicar a través de MCP
-        self.data_agent = DataAgent()
-        self.analysis_agent = AnalysisAgent()
-        # TODO: No funciona ...
-        self.memory_agent = MemoryAgent()
-        self.checkpointer = MemorySaver()
-        self.graph = self._build_graph()
+        # Clientes A2A
+        self.data_agent_client = A2AAgentClient(settings.A2A_DATA_AGENT_URL)
+        self.analysis_agent_client = A2AAgentClient(settings.A2A_ANALYSIS_AGENT_URL)
+        self.memory_agent_client = A2AAgentClient(settings.A2A_MEMORY_AGENT_URL)
 
     def _build_graph(self):
         builder = StateGraph(AgentState)
@@ -133,21 +131,17 @@ class Orchestrator:
 
         context = self._build_context_for_subagent(user_query, collected, messages)
 
+        # Modificado para usar clientes A2A
         if agent_name == "data_agent":
-            result = await self.data_agent.run([HumanMessage(content=context)])
-            response = self.data_agent.extract_final_response(result)
+            response = await self.data_agent_client.process_message(context)
             if response:
                 collected.append(f"[DataAgent]: {response}")
-
         elif agent_name == "analysis_agent":
-            result = await self.analysis_agent.run([HumanMessage(content=context)])
-            response = self.analysis_agent.extract_final_response(result)
+            response = await self.analysis_agent_client.process_message(context)
             if response:
                 collected.append(f"[AnalysisAgent]: {response}")
-
         elif agent_name == "memory_agent":
-            result = await self.memory_agent.run([HumanMessage(content=context)])
-            response = self.memory_agent.extract_final_response(result)
+            response = await self.memory_agent_client.process_message(context)
             if response:
                 collected.append(f"[MemoryAgent]: {response}")
 
