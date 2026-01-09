@@ -1,7 +1,7 @@
 import uvicorn
 from a2a.server.apps.rest import A2ARESTFastAPIApplication
 from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.types import AgentCard, AgentCapabilities
+from a2a.types import AgentCard, AgentCapabilities, AgentSkill
 from src.agents.analysis_agent import AnalysisAgent
 from src.a2a.base import BaseAgentExecutor
 from src.data.manager import DataManager
@@ -17,7 +17,54 @@ agent_card = AgentCard(
         state_transition_history=False,
         push_notifications=False,
         extensions=[]
-    )
+    ),
+    skills=[
+        AgentSkill(
+            id="predict_invoice_risk",
+            name="predict_invoice_risk",
+            description="Predice el riesgo de impago de una factura existente"
+        ),
+        AgentSkill(
+            id="predict_hypothetical_invoice",
+            name="predict_hypothetical_invoice",
+            description="Predice el riesgo de una factura hipotética para un cliente"
+        ),
+        AgentSkill(
+            id="get_high_risk_clients",
+            name="get_high_risk_clients",
+            description="Obtiene los clientes con mayor riesgo de impago"
+        ),
+        AgentSkill(
+            id="compare_clients",
+            name="compare_clients",
+            description="Compara varios clientes en términos de riesgo y comportamiento de pago"
+        ),
+        AgentSkill(
+            id="get_aging_report",
+            name="get_aging_report",
+            description="Genera un informe de antigüedad de deuda (global o por cliente)"
+        ),
+        AgentSkill(
+            id="get_portfolio_summary",
+            name="get_portfolio_summary",
+            description="Obtiene un resumen de la cartera completa con métricas agregadas"
+        ),
+        AgentSkill(
+            id="get_client_trend",
+            name="get_client_trend",
+            description="Analiza la tendencia de pago de un cliente a lo largo del tiempo"
+        ),
+        AgentSkill(
+            id="get_deteriorating_clients",
+            name="get_deteriorating_clients",
+            description="Identifica clientes cuyo comportamiento de pago está empeorando"
+        ),
+        AgentSkill(
+            id="generate_chart",
+            name="generate_chart",
+            description="Genera gráficos visuales para mostrar datos (barras, líneas, donut, etc.)"
+        ),
+    ]
 )
 
 _data_manager = None

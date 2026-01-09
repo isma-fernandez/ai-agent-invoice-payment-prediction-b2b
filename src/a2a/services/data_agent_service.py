@@ -1,7 +1,7 @@
 import uvicorn
 from a2a.server.apps.rest import A2ARESTFastAPIApplication
 from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.types import AgentCard, AgentCapabilities
+from a2a.types import AgentCard, AgentCapabilities, AgentSkill
 from src.agents.data_agent import DataAgent
 from src.a2a.base import BaseAgentExecutor
 from src.data.manager import DataManager
@@ -17,7 +17,49 @@ agent_card = AgentCard(
         state_transition_history=False,
         push_notifications=False,
         extensions=[]
-    )
+    ),
+    skills=[
+        AgentSkill(
+            id="search_client",
+            name="search_client",
+            description="Buscar cliente por nombre y obtener partner_id"
+        ),
+        AgentSkill(
+            id="get_client_info",
+            name="get_client_info",
+            description="Obtener información y estadísticas del cliente"
+        ),
+        AgentSkill(
+            id="get_client_invoices",
+            name="get_client_invoices",
+            description="Obtener facturas del cliente"
+        ),
+        AgentSkill(
+            id="get_invoice_by_name",
+            name="get_invoice_by_name",
+            description="Buscar factura por nombre"
+        ),
+        AgentSkill(
+            id="get_overdue_invoices",
+            name="get_overdue_invoices",
+            description="Obtener facturas vencidas"
+        ),
+        AgentSkill(
+            id="get_upcoming_due_invoices",
+            name="get_upcoming_due_invoices",
+            description="Obtener facturas próximas a vencer"
+        ),
+        AgentSkill(
+            id="get_invoices_by_period",
+            name="get_invoices_by_period",
+            description="Obtener facturas por período de fechas"
+        ),
+        AgentSkill(
+            id="check_connection",
+            name="check_connection",
+            description="Verificar conexión con Odoo"
+        ),
+    ]
 )
 
 _data_manager = None

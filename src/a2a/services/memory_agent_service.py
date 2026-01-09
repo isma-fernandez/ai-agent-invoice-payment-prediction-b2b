@@ -2,7 +2,7 @@
 import uvicorn
 from a2a.server.apps.rest import A2ARESTFastAPIApplication
 from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.types import AgentCard, AgentCapabilities
+from a2a.types import AgentCard, AgentCapabilities, AgentSkill
 from src.agents.memory_agent import MemoryAgent
 from src.a2a.base import BaseAgentExecutor
 from src.agents.store import MemoryStore
@@ -18,7 +18,29 @@ agent_card = AgentCard(
         state_transition_history=False,
         push_notifications=False,
         extensions=[]
-    )
+    ),
+    skills=[
+        AgentSkill(
+            id="save_client_note",
+            name="save_client_note",
+            description="Guarda una nota permanente sobre un cliente"
+        ),
+        AgentSkill(
+            id="get_client_notes",
+            name="get_client_notes",
+            description="Recupera las notas guardadas de un cliente"
+        ),
+        AgentSkill(
+            id="save_alert",
+            name="save_alert",
+            description="Guarda una alerta importante que requiere atención"
+        ),
+        AgentSkill(
+            id="get_active_alerts",
+            name="get_active_alerts",
+            description="Recupera las alertas activas del sistema"
+        ),
+    ]
 )
 
 _memory_store = None
