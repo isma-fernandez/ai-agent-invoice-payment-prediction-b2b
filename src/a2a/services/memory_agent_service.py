@@ -1,0 +1,53 @@
+# src/a2a/services/memory_agent_service.py
+import uvicorn
+from a2a.server.apps.rest import A2ARESTFastAPIApplication
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.types import AgentCard, AgentCapabilities
+from src.agents.memory_agent import MemoryAgent
+from src.a2a.base import BaseAgentExecutor
+from src.agents.store import MemoryStore
+from src.agents.shared import set_memory_store
+
+#TODO: A lo mejor mover esto a el archivo de agentes
+agent_card = AgentCard(
+    name="memory_agent",
+    description="Agente especializado en gestión de memoria persistente (notas y alertas)",
+    version="1.0.0",
+    capabilities=AgentCapabilities(
+        streaming=False,
+        state_transition_history=False,
+        push_notifications=False,
+        extensions=[]
+    )
+)
+
+_memory_store = None
+
+# TODO: Hay que tocar las rutas del memory store
+async def init_resources():
+    """Inicializa los recursos necesarios para el servicio."""
+    global _memory_store
+    if _memory_store is None:
+        _memory_store = MemoryStore()
+        set_memory_store(_memory_store)
+
+executor = BaseAgentExecutor(lambda: MemoryAgent())
+request_handler = DefaultRequestHandler(agent_executor=executor)
+
+a2a_app = A2ARESTFastAPIApplication(
+    agent_card=agent_card,
+    http_handler=request_handler
+)
+
+app = a2a_app.build()
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "agent": "memory_agent"}
+
+if __name__ == "__main__":
+    import asyncio
+    # Inicializar memory store antes del servidor
+    asyncio.run(init_resources())
+    # TODO: poner en variable de entorno el puerto
+    uvicorn.run(app, host="0.0.0.0", port=8003)
