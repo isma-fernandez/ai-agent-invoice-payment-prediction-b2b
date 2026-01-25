@@ -21,13 +21,6 @@ class Settings(BaseSettings):
     A2A_ANALYSIS_AGENT_URL: str = "http://localhost:8002"
     A2A_MEMORY_AGENT_URL: str = "http://localhost:8003"
 
-    # PostgreSQL docker
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_USER: str = "ismael"
-    POSTGRES_PASSWORD: str = "ismael"
-    POSTGRES_DB: str = "memory"
-
     # Servidor MCP de la memoria en PostgreSQL
     MCP_MEMORY_URL: str = "http://localhost:8100/mcp"
 

@@ -16,6 +16,8 @@ COPY src/agents/store.py src/agents/
 COPY src/agents/__init__.py src/agents/
 COPY src/data/models.py src/data/
 COPY src/data/__init__.py src/data/
+COPY src/config/__init__.py src/config/
+COPY src/config/memory_mcp_settings.py src/config/
 COPY src/__init__.py src/
 
 # Puerto servidor MCP

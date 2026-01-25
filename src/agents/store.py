@@ -1,7 +1,7 @@
-import sqlite3
+import psycopg2
 from datetime import datetime
-from pathlib import Path
 from src.data.models import Memory, MemoryType
+from src.config.memory_mcp_settings import memory_settings
 
 
 def _row_to_memory(row) -> Memory:
@@ -19,99 +19,103 @@ def _row_to_memory(row) -> Memory:
 
 
 class MemoryStore:
-    """Almacén de memoria semántica y episódica."""
-    def __init__(self, db_path: str = "data/agent_memory.db"):
-        """Inicializa la memoria."""
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self._init_tables()
+    """Almacén de memoria en PostgreSQL."""
 
-
-    def _init_tables(self):
-        """Inicializa la tabla de memoria del agente"""
-        self.conn.execute("""
-            CREATE TABLE IF NOT EXISTS memories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                memory_type TEXT NOT NULL,
-                content TEXT NOT NULL,
-                partner_id INTEGER,
-                partner_name TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP
-            )
-            """)
-        self.conn.execute("""CREATE INDEX IF NOT EXISTS idx_partner ON memories(partner_id)""")
-        self.conn.execute("""CREATE INDEX IF NOT EXISTS idx_type ON memories(memory_type)""")
-        self.conn.commit()
-
+    def __init__(self):
+        """Inicializa la conexión a PostgreSQL"""
+        self.conn = psycopg2.connect(
+            host=memory_settings.POSTGRES_HOST,
+            port=memory_settings.POSTGRES_PORT,
+            user=memory_settings.POSTGRES_USER,
+            password=memory_settings.POSTGRES_PASSWORD,
+            dbname=memory_settings.POSTGRES_DB
+        )
+        self.conn.autocommit = False
 
     def save(self, memory: Memory) -> int:
         """Guarda una memoria y devuelve su ID."""
-        cursor = self.conn.execute("""
-            INSERT INTO memories (memory_type, content, partner_id, partner_name, created_at, expires_at)
-            VALUES (?, ?, ?, ?, ?, ?)""",
-    (
-                memory.memory_type.value,
-                memory.content,
-                memory.partner_id,
-                memory.partner_name,
-                memory.created_at.isoformat(),
-                memory.expires_at.isoformat() if memory.expires_at else None
-            ))
-        self.conn.commit()
-        return cursor.lastrowid
-
+        with self.conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO memories (memory_type, content, partner_id, partner_name, created_at, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id""",
+                (
+                    memory.memory_type.value,
+                    memory.content,
+                    memory.partner_id,
+                    memory.partner_name,
+                    memory.created_at,
+                    memory.expires_at
+                )
+            )
+            memory_id = cursor.fetchone()[0]
+            self.conn.commit()
+            return memory_id
 
     def get_by_partner(self, partner_id: int, limit: int = 10) -> list[Memory]:
         """Obtiene memorias de un cliente específico."""
-        cursor = self.conn.execute("""
-            SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
-            FROM memories
-            WHERE partner_id = ?
-            AND (expires_at IS NULL OR expires_at > ?)
-            ORDER BY created_at DESC LIMIT ?""",
-        (partner_id, datetime.now().isoformat(), limit))
-        return [_row_to_memory(row) for row in cursor.fetchall()]
-
+        with self.conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
+                FROM memories
+                WHERE partner_id = %s
+                AND (expires_at IS NULL OR expires_at > %s)
+                ORDER BY created_at DESC
+                LIMIT %s""",
+                (partner_id, datetime.now(), limit)
+            )
+            return [_row_to_memory(row) for row in cursor.fetchall()]
 
     def get_by_type(self, memory_type: MemoryType, limit: int = 10) -> list[Memory]:
         """Obtiene memorias por tipo."""
-        cursor = self.conn.execute("""
-            SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
-            FROM memories
-            WHERE memory_type = ?
-            AND (expires_at IS NULL OR expires_at > ?)
-            ORDER BY created_at DESC LIMIT ?""",
-            (memory_type.value, datetime.now().isoformat(), limit))
-        return [_row_to_memory(row) for row in cursor.fetchall()]
-
+        with self.conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
+                FROM memories
+                WHERE memory_type = %s
+                AND (expires_at IS NULL OR expires_at > %s)
+                ORDER BY created_at DESC
+                LIMIT %s""",
+                (memory_type.value, datetime.now(), limit)
+            )
+            return [_row_to_memory(row) for row in cursor.fetchall()]
 
     def get_recent(self, limit: int = 20) -> list[Memory]:
         """Obtiene las memorias más recientes."""
-        cursor = self.conn.execute("""
-            SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
-            FROM memories
-            WHERE expires_at IS NULL
-            OR expires_at > ?
-            ORDER BY created_at DESC LIMIT ?
-        """, (datetime.now().isoformat(), limit))
-        return [_row_to_memory(row) for row in cursor.fetchall()]
-
+        with self.conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
+                FROM memories
+                WHERE expires_at IS NULL OR expires_at > %s
+                ORDER BY created_at DESC
+                LIMIT %s""",
+                (datetime.now(), limit)
+            )
+            return [_row_to_memory(row) for row in cursor.fetchall()]
 
     def search(self, query: str, limit: int = 10) -> list[Memory]:
         """Búsqueda simple por contenido."""
-        cursor = self.conn.execute("""
-            SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
-            FROM memories
-            WHERE content LIKE ?
-            AND (expires_at IS NULL OR expires_at > ?)
-            ORDER BY created_at DESC LIMIT ?
-        """, (f"%{query}%", datetime.now().isoformat(), limit))
-        return [_row_to_memory(row) for row in cursor.fetchall()]
-
+        with self.conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, memory_type, content, partner_id, partner_name, created_at, expires_at
+                FROM memories
+                WHERE content ILIKE %s
+                AND (expires_at IS NULL OR expires_at > %s)
+                ORDER BY created_at DESC
+                LIMIT %s""",
+                (f"%{query}%", datetime.now(), limit)
+            )
+            return [_row_to_memory(row) for row in cursor.fetchall()]
 
     def delete(self, memory_id: int) -> bool:
         """Elimina una memoria por ID."""
-        cursor = self.conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
-        self.conn.commit()
-        return cursor.rowcount > 0
+        with self.conn.cursor() as cursor:
+            cursor.execute("DELETE FROM memories WHERE id = %s", (memory_id,))
+            deleted = cursor.rowcount > 0
+            self.conn.commit()
+            return deleted
+
+    def close(self):
+        """Cierra la conexión a la base de datos."""
+        if self.conn:
+            self.conn.close()
