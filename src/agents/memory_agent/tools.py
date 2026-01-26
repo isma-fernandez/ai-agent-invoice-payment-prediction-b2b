@@ -1,6 +1,5 @@
 from langchain_core.tools import tool
-from src.data.models import Memory, MemoryType
-from src.agents.shared import get_memory_store
+from src.agents.memory_agent.mcp_client import get_memory_client
 
 
 @tool
@@ -15,15 +14,8 @@ async def save_client_note(partner_id: int, partner_name: str, note: str) -> str
         partner_name: Nombre del cliente.
         note: Contenido de la nota.
     """
-    ms = get_memory_store()
-    memory = Memory(
-        memory_type=MemoryType.CLIENT_NOTE,
-        content=note,
-        partner_id=partner_id,
-        partner_name=partner_name
-    )
-    ms.save(memory)
-    return f"Nota guardada para {partner_name}: {note}"
+    client = get_memory_client()
+    return await client.save_client_note(partner_id, partner_name, note)
 
 
 @tool
@@ -33,16 +25,8 @@ async def get_client_notes(partner_id: int) -> list[dict]:
     Args:
         partner_id: ID del cliente.
     """
-    ms = get_memory_store()
-    memories = ms.get_by_partner(partner_id)
-    return [
-        {
-            "id": m.id,
-            "content": m.content,
-            "created_at": m.created_at.isoformat()
-        }
-        for m in memories
-    ]
+    client = get_memory_client()
+    return await client.get_client_notes(partner_id)
 
 
 @tool
@@ -54,15 +38,8 @@ async def save_alert(content: str, partner_id: int = None, partner_name: str = N
         partner_id: ID del cliente si aplica (opcional).
         partner_name: Nombre del cliente si aplica (opcional).
     """
-    ms = get_memory_store()
-    memory = Memory(
-        memory_type=MemoryType.ALERT,
-        content=content,
-        partner_id=partner_id,
-        partner_name=partner_name
-    )
-    ms.save(memory)
-    return f"Alerta guardada: {content}"
+    client = get_memory_client()
+    return await client.save_alert(content, partner_id, partner_name)
 
 
 @tool
@@ -72,18 +49,8 @@ async def get_active_alerts(limit: int = 10) -> list[dict]:
     Args:
         limit: Máximo de alertas a devolver.
     """
-    ms = get_memory_store()
-    alerts = ms.get_by_type(MemoryType.ALERT, limit)
-    return [
-        {
-            "id": a.id,
-            "content": a.content,
-            "partner_id": a.partner_id,
-            "partner_name": a.partner_name,
-            "created_at": a.created_at.isoformat()
-        }
-        for a in alerts
-    ]
+    client = get_memory_client()
+    return await client.get_active_alerts(limit)
 
 
 MEMORY_TOOLS = [
