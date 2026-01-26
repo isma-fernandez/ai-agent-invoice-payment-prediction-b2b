@@ -286,6 +286,29 @@ class DataManager:
     # MÉTODOS DE PREDICCIÓN
     # =========================================================================
 
+    def _invoice_to_dict(self, row: pd.Series) -> dict:
+        """Convierte una fila de factura a diccionario para el MCP."""
+        return {
+            "id": int(row['id']) if pd.notna(row.get('id')) else None,
+            "name": row.get('name'),
+            "partner_id": int(row['partner_id']) if pd.notna(row.get('partner_id')) else None,
+            "partner_name": row.get('partner_name'),
+            "company_name": row.get('company_name'),
+            "currency_name": row.get('currency_name', 'EUR'),
+            "amount_total_eur": float(row['amount_total_eur']),
+            "amount_residual_eur": float(row.get('amount_residual_eur', row['amount_total_eur'])),
+            "invoice_date": row['invoice_date'].strftime('%Y-%m-%d') if pd.notna(row.get('invoice_date')) else None,
+            "invoice_date_due": row['invoice_date_due'].strftime('%Y-%m-%d') if pd.notna(row.get('invoice_date_due')) else None,
+            "payment_date": row['payment_dates'].strftime('%Y-%m-%d') if pd.notna(row.get('payment_dates')) else None,
+            "payment_state": row.get('payment_state', 'not_paid'),
+        }
+
+    def _history_to_list(self, df: pd.DataFrame) -> list:
+        """Convierte un DataFrame de historial a lista de diccionarios para el MCP."""
+        if df.empty:
+            return []
+        return [self._invoice_to_dict(row) for _, row in df.iterrows()]
+
     async def predict(self, invoice_id: int) -> PredictionResult:
         """Predice el riesgo de impago de una factura."""
         invoice_df = await self._get_invoice_df(invoice_id)
@@ -300,14 +323,12 @@ class DataManager:
         client_invoices = await self._get_client_invoices_df(partner_id)
         history = client_invoices[client_invoices['id'] != invoice_id]
 
-        X = self._feature_engineering.process_invoice_for_prediction(
-            new_invoice=invoice,
-            client_invoices_df=history
-        )
+        # Convertir a datos crudos y enviar al MCP
+        invoice_dict = self._invoice_to_dict(invoice)
+        history_list = self._history_to_list(history)
 
-        features = X.iloc[0].to_dict()
         mcp_client = get_prediction_client()
-        result = await mcp_client.predict(features)
+        result = await mcp_client.predict(invoice_dict, history_list)
 
         prediction = result["prediction"]
         prob_dict = result["probabilities"]
@@ -342,29 +363,19 @@ class DataManager:
         partner_name = history['partner_name'].iloc[0]
         company_name = history['company_name'].iloc[0]
 
-        hypothetic_invoice = pd.Series({
-            'id': -1,
-            'name': 'hypothetic_invoice',
-            'partner_id': partner_id,
-            'partner_name': partner_name,
-            'company_name': company_name,
-            'currency_name': 'EUR',
-            'amount_total_eur': amount_eur,
-            'amount_residual_eur': amount_eur,
-            'invoice_date': invoice_date_ts,
-            'invoice_date_due': due_date_ts,
-            'payment_dates': pd.NaT,
-            'payment_state': 'not_paid',
-        })
+        # Construir factura hipotética como diccionario
+        invoice_dict = {
+            "amount_total_eur": amount_eur,
+            "invoice_date": invoice_date_ts.strftime('%Y-%m-%d'),
+            "invoice_date_due": due_date_ts.strftime('%Y-%m-%d'),
+            "currency_name": "EUR",
+            "company_name": company_name,
+        }
 
-        X = self._feature_engineering.process_invoice_for_prediction(
-            new_invoice=hypothetic_invoice,
-            client_invoices_df=history
-        )
+        history_list = self._history_to_list(history)
 
-        features = X.iloc[0].to_dict()
         mcp_client = get_prediction_client()
-        result = await mcp_client.predict(features)
+        result = await mcp_client.predict(invoice_dict, history_list)
 
         prediction = result["prediction"]
         prob_dict = result["probabilities"]
