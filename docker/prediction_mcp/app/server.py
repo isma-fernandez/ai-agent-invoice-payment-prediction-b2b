@@ -1,7 +1,7 @@
 from fastmcp import FastMCP
 from typing import Dict, List
 
-from .predictor import Predictor
+from app.predictor import Predictor
 
 mcp = FastMCP("prediction-mcp")
 

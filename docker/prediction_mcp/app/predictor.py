@@ -2,8 +2,8 @@ import joblib
 import pandas as pd
 from typing import Dict, List
 
-from .data_processor import DataProcessor
-from .feature_engineering import FeatureEngineering
+from app.data_processor import DataProcessor
+from app.feature_engineering import FeatureEngineering
 
 
 class Predictor:
