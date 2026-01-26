@@ -22,7 +22,7 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_USER=ismael
       - POSTGRES_PASSWORD=ismael
-      - POSTGRES_DB=agent_memory
+      - POSTGRES_DB=memory
     depends_on:
       - postgres
 

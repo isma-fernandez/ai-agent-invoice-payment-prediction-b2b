@@ -1,5 +1,20 @@
+import json
 from fastmcp import Client
 from src.config.settings import settings
+
+
+def _parse_result(result):
+    """Extrae el texto de un CallToolResult de fastmcp."""
+    if result.is_error:
+        raise Exception(f"Error MCP: {result.content}")
+
+    text = result.content[0].text
+    
+    # Si es json
+    if text.startswith('[') or text.startswith('{'):
+        return json.loads(text)
+    
+    return text
 
 
 class MemoryMCPClient:
@@ -23,7 +38,7 @@ class MemoryMCPClient:
                 "save_client_note",
                 {"partner_id": partner_id, "partner_name": partner_name, "note": note}
             )
-            return result
+            return _parse_result(result)
 
     async def get_client_notes(self, partner_id: int) -> list[dict]:
         """Recupera las notas de un cliente."""
@@ -33,7 +48,7 @@ class MemoryMCPClient:
                 "get_client_notes",
                 {"partner_id": partner_id}
             )
-            return result
+            return _parse_result(result) or []
 
     async def save_alert(self, content: str, partner_id: int = None, partner_name: str = None) -> str:
         """Guarda una alerta."""
@@ -45,7 +60,7 @@ class MemoryMCPClient:
             if partner_name is not None:
                 args["partner_name"] = partner_name
             result = await client.call_tool("save_alert", args)
-            return result
+            return _parse_result(result)
 
     async def get_active_alerts(self, limit: int = 10) -> list[dict]:
         """Recupera las alertas activas."""
@@ -55,7 +70,7 @@ class MemoryMCPClient:
                 "get_active_alerts",
                 {"limit": limit}
             )
-            return result
+            return _parse_result(result) or []
 
 
 _memory_client: MemoryMCPClient | None = None

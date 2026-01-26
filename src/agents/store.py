@@ -4,6 +4,15 @@ from src.data.models import Memory, MemoryType
 from src.config.memory_mcp_settings import memory_settings
 
 
+def _parse_datetime(value) -> datetime:
+    """Convierte valor a datetime."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(str(value))
+
+
 def _row_to_memory(row) -> Memory:
     """Convierte los datos obtenidos de la bsae de datos a
     objeto Memory"""
