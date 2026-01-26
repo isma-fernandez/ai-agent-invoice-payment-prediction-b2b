@@ -3,6 +3,7 @@ from typing import Optional, Dict, List, Any
 import joblib
 
 from src.utils.odoo_connector import OdooConnection
+from src.agents.analysis_agent.mcp_client import get_prediction_client
 from .retriever import DataRetriever
 from .cleaner import DataCleaner
 from .feature_engineering import FeatureEngineering
@@ -304,14 +305,12 @@ class DataManager:
             client_invoices_df=history
         )
 
-        prediction_idx = int(self._model.predict(X)[0])
-        prediction = self.LABEL_MAPPING[prediction_idx]
-        probabilities = self._model.predict_proba(X)[0]
-        classes = self._model.classes_
-        prob_dict = {
-            str(clase): round(float(prob), 4)
-            for clase, prob in zip(classes, probabilities)
-        }
+        features = X.iloc[0].to_dict()
+        mcp_client = get_prediction_client()
+        result = await mcp_client.predict(features)
+
+        prediction = result["prediction"]
+        prob_dict = result["probabilities"]
 
         return PredictionResult(
             partner_id=int(partner_id),
@@ -363,14 +362,12 @@ class DataManager:
             client_invoices_df=history
         )
 
-        prediction_idx = int(self._model.predict(X)[0])
-        prediction = self.LABEL_MAPPING[prediction_idx]
-        probabilities = self._model.predict_proba(X)[0]
-        classes = self._model.classes_
-        prob_dict = {
-            str(clase): round(float(prob), 4)
-            for clase, prob in zip(classes, probabilities)
-        }
+        features = X.iloc[0].to_dict()
+        mcp_client = get_prediction_client()
+        result = await mcp_client.predict(features)
+
+        prediction = result["prediction"]
+        prob_dict = result["probabilities"]
 
         return PredictionResult(
             partner_id=partner_id,
