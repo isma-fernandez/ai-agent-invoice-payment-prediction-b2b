@@ -23,18 +23,22 @@ class PredictionMCPClient:
             self._client = Client(self.server_url)
         return self._client
 
-    async def predict(self, features: dict) -> dict:
-        """Predice el riesgo de impago a partir de features.
+    async def predict(self, invoice: dict, client_history: list) -> dict:
+        """Predice el riesgo de impago de una factura.
 
         Args:
-            features: Diccionario con las 23 features del modelo.
+            invoice: Datos de la factura a predecir.
+            client_history: Historial de facturas del cliente.
 
         Returns:
             dict con prediction y probabilities
         """
         client = await self._get_client()
         async with client:
-            result = await client.call_tool("predict", {"features": features})
+            result = await client.call_tool(
+                "predict_invoice",
+                {"invoice": invoice, "client_history": client_history}
+            )
             return _parse_result(result)
 
 _prediction_client: PredictionMCPClient | None = None
