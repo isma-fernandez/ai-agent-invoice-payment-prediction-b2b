@@ -26,5 +26,12 @@ services:
     depends_on:
       - postgres
 
+  prediction-mcp-server:
+    build:
+      context: .
+      dockerfile: docker/prediction_mcp/Dockerfile
+    ports:
+      - "8200:8200"
+
 volumes:
   postgres_data:

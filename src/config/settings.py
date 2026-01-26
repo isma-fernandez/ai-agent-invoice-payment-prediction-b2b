@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     A2A_ANALYSIS_AGENT_URL: str = "http://localhost:8002"
     A2A_MEMORY_AGENT_URL: str = "http://localhost:8003"
 
-    # Servidor MCP de la memoria en PostgreSQL
+    # Servidores MCP
     MCP_MEMORY_URL: str = "http://localhost:8100/mcp"
+    MCP_PREDICTION_URL: str = "http://localhost:8200/mcp"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
