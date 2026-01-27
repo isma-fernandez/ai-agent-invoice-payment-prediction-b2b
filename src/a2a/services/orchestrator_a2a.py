@@ -11,7 +11,7 @@ from src.config.settings import settings
 
 
 class OrchestratorExecutor(AgentExecutor):
-    """Executor A2A para el orquestador (requiere thread_id)."""
+    """Executor A2A para el orquestador."""
 
     def __init__(self, get_agent_func):
         super().__init__()
