@@ -2,7 +2,7 @@ import json
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from src.api.schemas import ChatRequest, ChatResponse
-from src.api.main import get_agent
+from src.api.dependencies import get_agent
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 

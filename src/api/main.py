@@ -1,23 +1,9 @@
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from src.agents.orchestrator import FinancialAgent
+from src.api.dependencies import get_agent
 from src.api.routes import chat, health
 from src.a2a.services.orchestrator_a2a import create_a2a_app
-
-_agent: FinancialAgent | None = None
-
-
-async def get_agent() -> FinancialAgent:
-    """Obtiene la instancia del agente."""
-    global _agent
-    if _agent is None:
-        _agent = FinancialAgent()
-        await _agent.initialize(
-            # TODO: Eliminar cutoff_date en producción
-            cutoff_date="2025-01-01"
-        )
-    return _agent
 
 
 @asynccontextmanager
