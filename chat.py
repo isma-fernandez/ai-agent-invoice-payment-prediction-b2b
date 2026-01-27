@@ -34,7 +34,7 @@ for message in st.session_state.messages:
 
 def send_message(prompt: str, thread_id: str) -> str:
     """Envía un mensaje al orchestrator y devuelve la respuesta."""
-    with httpx.Client(timeout=120.0) as client:
+    with httpx.Client(timeout=900.0) as client:  # 15 minutos
         response = client.post(
             f"{ORCHESTRATOR_URL}/chat",
             json={"message": prompt, "thread_id": thread_id}

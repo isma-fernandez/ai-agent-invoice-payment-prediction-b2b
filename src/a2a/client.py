@@ -5,7 +5,7 @@ import httpx
 
 
 class A2AAgentClient:
-    def __init__(self, base_url: str, timeout: int = 120):
+    def __init__(self, base_url: str, timeout: int = 900):  # 15 minutos
         self.base_url = base_url
         self.timeout = timeout
     
