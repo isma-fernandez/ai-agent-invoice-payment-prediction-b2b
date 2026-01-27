@@ -183,7 +183,7 @@ async def generate_chart(chart_type: ChartType, title: str, data: dict, show_val
         show_values (bool): Mostrar valores numéricos en el gráfico.
 
     Returns:
-        str: Marcador del gráfico en formato "CHART:id" para renderizar en la UI.
+        str: Marcador del gráfico en formato "CHART_JSON:{json}" para renderizar en la UI.
     """
     chart_id = await chart_generator.create_chart(
         chart_type=chart_type,
@@ -191,7 +191,11 @@ async def generate_chart(chart_type: ChartType, title: str, data: dict, show_val
         data=data,
         show_values=show_values
     )
-    return f"CHART:{chart_id}"
+    # Serializar el gráfico como JSON para que el cliente pueda renderizarlo
+    fig = chart_generator.get_chart(chart_id)
+    chart_json = fig.to_json()
+    chart_generator.clear_chart(chart_id)  # Limpiar memoria
+    return f"CHART_JSON:{chart_json}"
 
 ANALYSIS_TOOLS = [
     predict_invoice_risk,

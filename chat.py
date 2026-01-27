@@ -1,8 +1,9 @@
 import re
+import json
 import uuid
 import httpx
 import streamlit as st
-from src.utils.chart_generator import chart_generator
+import plotly.io as pio
 
 ORCHESTRATOR_URL = "http://localhost:8004"
 
@@ -60,17 +61,21 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
             status_placeholder.empty()
 
             if final_response:
-                # Eliminar marcadores de gráficos del texto
-                chart_matches = re.findall(r'CHART:([a-f0-9]+)', final_response)
-                clean_response = re.sub(r'CHART:[a-f0-9]+', '', final_response).strip()
+                # Extraer gráficos JSON de la respuesta
+                chart_pattern = r'CHART_JSON:(\{.*?\})(?=\s*CHART_JSON:|\s*$)'
+                chart_matches = re.findall(chart_pattern, final_response, re.DOTALL)
+                
+                # Limpiar marcadores de gráficos del texto
+                clean_response = re.sub(r'CHART_JSON:\{.*?\}(?=\s*CHART_JSON:|\s*$)', '', final_response, flags=re.DOTALL).strip()
                 message_placeholder.markdown(clean_response)
 
                 # Renderizar gráficos si existen
-                for chart_id in chart_matches:
-                    fig = chart_generator.get_chart(chart_id)
-                    if fig:
+                for chart_json in chart_matches:
+                    try:
+                        fig = pio.from_json(chart_json)
                         st.plotly_chart(fig, use_container_width=True)
-                        chart_generator.clear_chart(chart_id)
+                    except Exception as e:
+                        st.warning(f"Error al renderizar gráfico: {e}")
 
                 st.session_state.messages.append({"role": "assistant", "content": clean_response})
             else:
