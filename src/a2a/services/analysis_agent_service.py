@@ -92,7 +92,6 @@ async def init_resources():
         _data_manager = DataManager()
         await _data_manager.connect()
         set_data_manager(_data_manager)
-        _data_manager.load_model("models/late_invoice_payment_classification.pkl")
     
 
 executor = BaseAgentExecutor(lambda: AnalysisAgent())

@@ -1,6 +1,5 @@
 import pandas as pd
 from typing import Optional, Dict, List, Any
-import joblib
 
 from src.utils.odoo_connector import OdooConnection
 from .retriever import DataRetriever
@@ -24,8 +23,6 @@ class DataManager:
     Para calcular deuda vencida/pendiente SIEMPRE usar amount_residual_eur.
     """
 
-    LABEL_MAPPING = {0: 'Grave', 1: 'Leve', 2: 'Puntual'}
-
     def __init__(self, cutoff_date: str = None):
         """Inicializa el DataManager."""
         self.cutoff = cutoff_date or pd.Timestamp.now().strftime('%Y-%m-%d')
@@ -38,14 +35,6 @@ class DataManager:
         # Limpieza de datos
         self._cleaner: DataCleaner = DataCleaner()
 
-        # Modelos
-        self._models: Dict[str, Any] = {}
-        self._model: Optional[Any] = None
-        self._transformations: Dict[str, Any] = {}
-
-    def is_model_loaded(self):
-        return self._model is not None
-
     async def connect(self) -> None:
         """Establece la conexión con Odoo."""
         self.odoo_connection = OdooConnection()
@@ -54,12 +43,6 @@ class DataManager:
             odoo_connection=self.odoo_connection,
             cutoff_date=self.cutoff
         )
-
-    def load_model(self, model_path: str) -> None:
-        """Carga un modelo de predicción."""
-        model = joblib.load(model_path)
-        self._models['invoice_risk_model'] = model
-        self._model = model
 
     # =========================================================================
     # MÉTODOS INTERNOS DE PROCESAMIENTO
