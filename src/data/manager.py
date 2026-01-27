@@ -3,7 +3,6 @@ from typing import Optional, Dict, List, Any
 import joblib
 
 from src.utils.odoo_connector import OdooConnection
-from src.agents.analysis_agent.mcp_client import get_prediction_client
 from .retriever import DataRetriever
 from .cleaner import DataCleaner
 from .models import (
@@ -328,6 +327,8 @@ class DataManager:
 
     async def predict(self, invoice_id: int) -> PredictionResult:
         """Predice el riesgo de impago de una factura."""
+        from src.mcp.prediction_client import get_prediction_client
+
         invoice_df = await self._get_invoice_df(invoice_id)
         if invoice_df is None:
             raise ValueError(f"La factura con ID {invoice_id} no existe.")
@@ -366,6 +367,8 @@ class DataManager:
             self, partner_id: int, amount_eur: float, invoice_date: str = None,
             due_date: str = None, payment_term_days: int = 30) -> PredictionResult:
         """Predice riesgo para una factura hipotética."""
+        from src.mcp.prediction_client import get_prediction_client
+
         invoice_date_ts = pd.Timestamp(invoice_date) if invoice_date else pd.Timestamp.now()
         if due_date:
             due_date_ts = pd.Timestamp(due_date)

@@ -1,5 +1,5 @@
 from langchain_core.tools import tool
-from src.agents.memory_agent.mcp_client import get_memory_client
+from src.mcp.memory_client import get_memory_client
 
 
 @tool

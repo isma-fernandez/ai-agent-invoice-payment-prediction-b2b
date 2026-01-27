@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     MCP_MEMORY_URL: str = "http://localhost:8100/mcp"
     MCP_PREDICTION_URL: str = "http://localhost:8200/mcp"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
 

@@ -11,7 +11,7 @@ class MemoryMCPSettings(BaseSettings):
     POSTGRES_PASSWORD: str = "ismael"
     POSTGRES_DB: str = "memory"
 
-    model_config = SettingsConfigDict(env_file=".env",env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 memory_settings = MemoryMCPSettings()
