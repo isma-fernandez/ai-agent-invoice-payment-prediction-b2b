@@ -68,6 +68,7 @@ services:
       - ODOO_USERNAME=${ODOO_USERNAME}
       - ODOO_PASSWORD=${ODOO_PASSWORD}
       - API_MISTRAL_KEY=${API_MISTRAL_KEY}
+      - A2A_DATA_AGENT_URL=http://data-agent:8001
 
   analysis-agent:
     build:
@@ -83,6 +84,7 @@ services:
       - ODOO_PASSWORD=${ODOO_PASSWORD}
       - API_MISTRAL_KEY=${API_MISTRAL_KEY}
       - MCP_PREDICTION_URL=http://prediction-mcp-server:8200/mcp
+      - A2A_ANALYSIS_AGENT_URL=http://analysis-agent:8002
     depends_on:
       - prediction-mcp-server
 
@@ -96,6 +98,7 @@ services:
       - AGENT_TYPE=memory_agent
       - API_MISTRAL_KEY=${API_MISTRAL_KEY}
       - MCP_MEMORY_URL=http://memory-mcp-server:8100/mcp
+      - A2A_MEMORY_AGENT_URL=http://memory-agent:8003
     depends_on:
       - memory-mcp-server
 
