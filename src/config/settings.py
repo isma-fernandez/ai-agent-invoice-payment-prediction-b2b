@@ -2,11 +2,11 @@ import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings): 
-    # Configuración Odoo
-    ODOO_URL: str
-    ODOO_DB: str
-    ODOO_USERNAME: str
-    ODOO_PASSWORD: str
+    # Configuración Odoo (opcional para agentes que no lo necesitan)
+    ODOO_URL: str | None = None
+    ODOO_DB: str | None = None
+    ODOO_USERNAME: str | None = None
+    ODOO_PASSWORD: str | None = None
 
     # Mistral
     API_MISTRAL_KEY: str

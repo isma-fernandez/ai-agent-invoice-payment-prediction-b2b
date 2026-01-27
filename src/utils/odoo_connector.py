@@ -5,6 +5,11 @@ import asyncio
 
 class OdooConnection:
     def __init__(self):
+        # Validar que las credenciales estén en el entorno
+        if not all([settings.ODOO_URL, settings.ODOO_DB, 
+                    settings.ODOO_USERNAME, settings.ODOO_PASSWORD]):
+            raise ValueError("Credenciales de Odoo no configuradas. "
+                "Asegúrate de definir ODOO_URL, ODOO_DB, ODOO_USERNAME y ODOO_PASSWORD.")
         self.url = settings.ODOO_URL
         self.db = settings.ODOO_DB
         self.username = settings.ODOO_USERNAME
