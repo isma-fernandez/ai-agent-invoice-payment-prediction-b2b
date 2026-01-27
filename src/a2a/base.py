@@ -47,6 +47,12 @@ class BaseAgentExecutor(AgentExecutor):
         await self.initialize()
 
         text_content = extract_text_from_message(context.message)
+        agent_name = self.langgraph_agent.__class__.__name__
+
+        print(f"\n{'=' * 50}")
+        print(f"[{agent_name}] REQUEST")
+        print(f"Query: {text_content[:200]}{'...' if len(text_content) > 200 else ''}")
+        print(f"{'=' * 50}\n")
 
         if not text_content:
             response = create_a2a_response("Error: No hay contenido de texto en el mensaje")
@@ -55,6 +61,11 @@ class BaseAgentExecutor(AgentExecutor):
 
         result = await self.langgraph_agent.run([HumanMessage(content=text_content)])
         response_text = self.langgraph_agent.extract_final_response(result) or ""
+
+        print(f"\n{'=' * 50}")
+        print(f"[{agent_name}] RESPONSE")
+        print(f"Response: {response_text[:500]}{'...' if len(response_text) > 500 else ''}")
+        print(f"{'=' * 50}\n")
 
         response = create_a2a_response(response_text)
         await event_queue.enqueue_event(response)
