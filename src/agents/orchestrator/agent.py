@@ -1,6 +1,5 @@
 from src.data.manager import DataManager
-from src.agents.store import MemoryStore
-from src.agents.shared import set_data_manager, set_memory_store
+from src.agents.shared import set_data_manager
 from .graph import Orchestrator
 
 
@@ -19,9 +18,6 @@ class FinancialAgent:
         dm = DataManager(cutoff_date=cutoff_date)
         await dm.connect()
         set_data_manager(dm)
-
-        ms = MemoryStore()
-        set_memory_store(ms)
 
         self._orchestrator = Orchestrator()
         self._initialized = True
