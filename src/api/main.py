@@ -2,7 +2,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from src.agents.orchestrator import FinancialAgent
-from src.config.settings import settings
+from src.api.routes import chat, health
 
 _agent: FinancialAgent | None = None
 
@@ -22,11 +22,9 @@ async def get_agent() -> FinancialAgent:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Maneja el ciclo de vida de la aplicación."""
-    # Start
     await get_agent()
     print("Orchestrator inicializado correctamente")
     yield
-    # Final
     print("Orchestrator finalizado")
 
 
@@ -37,11 +35,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-
-@app.get("/health")
-async def health():
-    """Health check del servicio."""
-    return {"status": "ok", "service": "orchestrator"}
+#endpoints
+app.include_router(health.router)
+app.include_router(chat.router)
 
 
 if __name__ == "__main__":
