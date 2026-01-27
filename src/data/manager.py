@@ -6,7 +6,6 @@ from src.utils.odoo_connector import OdooConnection
 from src.agents.analysis_agent.mcp_client import get_prediction_client
 from .retriever import DataRetriever
 from .cleaner import DataCleaner
-from .feature_engineering import FeatureEngineering
 from .models import (
     ClientSearchResult, ClientInfo, InvoiceSummary,
     PredictionResult, RiskCategory, PaymentState,
@@ -37,9 +36,8 @@ class DataManager:
         self.odoo_connection: Optional[OdooConnection] = None
         self.data_retriever: Optional[DataRetriever] = None
 
-        # Limpieza y procesamiento de datos
+        # Limpieza de datos
         self._cleaner: DataCleaner = DataCleaner()
-        self._feature_engineering: FeatureEngineering = FeatureEngineering(cutoff_date=cutoff_date)
 
         # Modelos
         self._models: Dict[str, Any] = {}
@@ -69,7 +67,7 @@ class DataManager:
     # =========================================================================
 
     async def _get_client_invoices_df(self, partner_id: int) -> pd.DataFrame:
-        """Obtiene TODAS las facturas de un cliente con features calculadas."""
+        """Obtiene TODAS las facturas de un cliente con campos de retraso calculados."""
         raw_data = await self.data_retriever.get_invoices_by_partner(partner_id)
         if not raw_data:
             return pd.DataFrame()
@@ -80,8 +78,27 @@ class DataManager:
         if clean_data is None or clean_data.empty:
             return pd.DataFrame()
 
-        dataset = self._feature_engineering.generate_full_client_data(clean_data)
+        # Calcular campos de retraso para facturas pagadas
+        dataset = self._add_payment_delay_columns(clean_data)
         return dataset
+
+    def _add_payment_delay_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Añade datos de retraso de pago.
+        
+        Calcula:
+        - payment_overdue_days: días entre fecha de pago y fecha de vencimiento
+        - paid_late: True si payment_overdue_days > 0
+        """
+        df = df.copy()
+        
+        # Solo calcular para facturas pagadas
+        paid_mask = (df['payment_state'] == 'paid') & df['payment_dates'].notna()
+        if paid_mask.any():
+            df.loc[paid_mask, 'payment_overdue_days'] = (
+                df.loc[paid_mask, 'payment_dates'] - df.loc[paid_mask, 'invoice_date_due']
+            ).dt.days
+            df.loc[paid_mask, 'paid_late'] = df.loc[paid_mask, 'payment_overdue_days'] > 0
+        return df
 
     async def _get_invoice_df(self, invoice_id: int) -> Optional[pd.DataFrame]:
         """Obtiene una factura específica."""
@@ -715,7 +732,7 @@ class DataManager:
         if not df_all.empty:
             paid_df = df_all[df_all['payment_state'] == 'paid']
             if len(paid_df) > 0:
-                paid_df = self._feature_engineering._add_payment_features(paid_df)
+                paid_df = self._add_payment_delay_columns(paid_df)
                 total_delay_days = paid_df['payment_overdue_days'].sum()
                 paid_count = len(paid_df)
 
