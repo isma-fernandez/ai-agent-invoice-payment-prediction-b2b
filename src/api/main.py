@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from src.agents.orchestrator import FinancialAgent
 from src.api.routes import chat, health
+from src.a2a.services.orchestrator_a2a import create_a2a_app
 
 _agent: FinancialAgent | None = None
 
@@ -39,6 +40,10 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(chat.router)
 
+# A2A para agentes externos
+a2a_app = create_a2a_app(get_agent)
+app.mount("/a2a", a2a_app)
+
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8004)
