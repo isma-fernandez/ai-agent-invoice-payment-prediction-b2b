@@ -23,7 +23,8 @@ def generate_router_prompt(agent_cards: dict[str, dict]) -> str:
         
         agents_section += "\n"
     
-    return ROUTER_PROMPT_TEMPLATE.format(agents_available=agents_section.strip())
+    # Usar replace en vez de format, format necesita todos los parámetros
+    return ROUTER_PROMPT_TEMPLATE.replace("{agents_available}", agents_section.strip())
 
 
 # Template base del router prompt
