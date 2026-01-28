@@ -210,7 +210,7 @@ class DataManager:
         avg_delay_days = 0.0
 
         if paid_count > 0:
-            on_time_count = (~paid_df['paid_late']).sum()
+            on_time_count = (paid_df['paid_late'] == False).sum()
             on_time_ratio = round(on_time_count / paid_count, 4)
             avg_delay_days = round(float(paid_df['payment_overdue_days'].mean()), 2)
 
@@ -758,7 +758,8 @@ class DataManager:
         def calc_stats(subset):
             if len(subset) == 0:
                 return 0, 0.0, 0.0
-            on_time = (~subset['paid_late']).sum() / len(subset)
+            # puede ser object, no bool
+            on_time = (subset['paid_late'] == False).sum() / len(subset)
             avg_delay = subset['payment_overdue_days'].mean()
             return len(subset), round(on_time, 4), round(avg_delay, 2)
 
