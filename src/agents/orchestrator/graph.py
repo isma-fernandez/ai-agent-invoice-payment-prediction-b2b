@@ -185,15 +185,22 @@ class Orchestrator:
         ids_found = {}
 
         for item in collected:
-            # Patrón 1: "Nombre (ID: 123)" - formato general
+            # Patrón 1: "**Nombre** (ID: **123**)" formato markdown
+            pattern_bold = r'\*\*([^*]+)\*\*\s*\(ID:\s*\*\*(\d+)\*\*\)'
+            matches_bold = re.findall(pattern_bold, item)
+            for name, pid in matches_bold:
+                clean_name = name.strip()
+                if clean_name and len(clean_name) > 2:
+                    ids_found[clean_name] = int(pid)
+            
+            # Patrón 2: "Nombre (ID: 123)" formato general sin markdown
             matches = re.findall(r'([A-Za-zÀ-ÿ\s\.,&\-]+?)\s*\(ID:\s*(\d+)\)', item)
             for name, pid in matches:
                 clean_name = name.strip().rstrip(':').strip()
-                # Filtrar nombres muy genéricos o vacíos
                 if clean_name and len(clean_name) > 2 and clean_name.lower() not in ['id', 'partner', 'cliente']:
                     ids_found[clean_name] = int(pid)
 
-            # Patrón 2: "**Cliente: Nombre (ID: 123)**" - formato markdown
+            # Patrón 3: "**Cliente: Nombre (ID: 123)**" - otro formato markdown
             pattern_markdown = r'\*\*Cliente:\s*(.+?)\s*\(ID:\s*(\d+)\)\*\*'
             matches_md = re.findall(pattern_markdown, item)
             for name, pid in matches_md:
@@ -201,7 +208,7 @@ class Orchestrator:
                 if clean_name:
                     ids_found[clean_name] = int(pid)
 
-            # Patrón 3: "**Cliente N: Nombre**\n- ID: 123" - formato con ID en línea separada
+            # Patrón 4: "**Cliente N: Nombre**\n- ID: 123" - formato con ID en línea separada
             pattern_multiline = r'\*\*(?:Cliente \d+:\s*)?([A-Za-zÀ-ÿ\s\.,&\-]+?)\*\*\s*\n-\s*ID:\s*(\d+)'
             matches_ml = re.findall(pattern_multiline, item)
             for name, pid in matches_ml:
@@ -245,22 +252,29 @@ class Orchestrator:
         print(f"Collected data: {collected}")
         print(f"{'=' * 50}\n")
 
-        # Necesario para graficar correctamente los gráficos
-        chart_markers = []
+        # Extraer gráficos JSON de los collected_data
+        # se añaden al final de la respuesta del orquestador
+        chart_jsons = []
+        cleaned_collected = []
         for item in collected:
-            charts = re.findall(r'CHART:[a-f0-9]+', item)
-            chart_markers.extend(charts)
+            temp = item.replace("CHART:CHART_JSON:", "CHART_JSON:")
+            while "CHART_JSON:" in temp:
+                idx = temp.find("CHART_JSON:")
+                json_start = idx + len("CHART_JSON:")
+                try:
+                    chart_obj, end = json.JSONDecoder().raw_decode(temp[json_start:])
+                    chart_jsons.append(json.dumps(chart_obj))
+                    temp = temp[:idx] + temp[json_start + end:]
+                except:
+                    break
+            cleaned_collected.append(temp.strip())
 
-        charts_instruction = ""
-        if chart_markers:
-            charts_instruction = f"\n\nINCLUYE OBLIGATORIAMENTE estos marcadores de gráfico AL FINAL de tu respuesta (en una línea separada, tal cual): {' '.join(chart_markers)}"
-
+        # Prompt SIN gráfico
         system_instruction = (
-                "Eres un asistente financiero profesional. "
-                "Responde en español, sin emojis, de forma directa. "
-                "Adapta la extensión a la complejidad de la pregunta. "
-                "NO resumas datos numéricos. NO inventes datos."
-                + charts_instruction
+            "Eres un asistente financiero profesional. "
+            "Responde en español, sin emojis, de forma directa. "
+            "Adapta la extensión a la complejidad de la pregunta. "
+            "NO resumas datos numéricos. NO inventes datos."
         )
 
         if not collected:
@@ -270,7 +284,7 @@ class Orchestrator:
             ])
             final_response = response.content
         else:
-            collected_str = "\n".join(collected)
+            collected_str = "\n".join(cleaned_collected)
             prompt = FINAL_ANSWER_PROMPT.format(
                 conversation_history=history_str,
                 user_query=user_query,
@@ -282,6 +296,11 @@ class Orchestrator:
                 HumanMessage(content=prompt)
             ])
             final_response = response.content
+
+        # Añadir gráficos directamente al final
+        if chart_jsons:
+            charts_str = " ".join([f"CHART_JSON:{cj}" for cj in chart_jsons])
+            final_response = f"{final_response}\n\n{charts_str}"
 
         return {"messages": [AIMessage(content=final_response)]}
 
