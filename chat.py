@@ -61,18 +61,25 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
             status_placeholder.empty()
 
             if final_response:
+                clean_response = final_response.replace("CHART:CHART_JSON:", "CHART_JSON:")
                 # Extraer gráficos JSON de la respuesta
-                chart_pattern = r'CHART_JSON:(\{.*?\})(?=\s*CHART_JSON:|\s*$)'
-                chart_matches = re.findall(chart_pattern, final_response, re.DOTALL)
+                charts = []
+                while "CHART_JSON:" in clean_response:
+                    idx = clean_response.find("CHART_JSON:")
+                    json_start = idx + len("CHART_JSON:")
+                    try:
+                        chart_data, end = json.JSONDecoder().raw_decode(clean_response[json_start:])
+                        charts.append(chart_data)
+                        clean_response = clean_response[:idx] + clean_response[json_start + end:]
+                    except json.JSONDecodeError:
+                        break
                 
-                # Limpiar marcadores de gráficos del texto
-                clean_response = re.sub(r'CHART_JSON:\{.*?\}(?=\s*CHART_JSON:|\s*$)', '', final_response, flags=re.DOTALL).strip()
+                clean_response = clean_response.strip()
                 message_placeholder.markdown(clean_response)
 
-                # Renderizar gráficos si existen
-                for chart_json in chart_matches:
+                for chart_data in charts:
                     try:
-                        fig = pio.from_json(chart_json)
+                        fig = pio.from_json(json.dumps(chart_data))
                         st.plotly_chart(fig, use_container_width=True)
                     except Exception as e:
                         st.warning(f"Error al renderizar gráfico: {e}")
