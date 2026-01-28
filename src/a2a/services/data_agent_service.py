@@ -29,50 +29,50 @@ agent_card = AgentCard(
         AgentSkill(
             id="search_client",
             name="search_client",
-            description="Buscar cliente por nombre y obtener partner_id",
-            tags=["client", "search", "odoo"]
+            description="Buscar cliente por NOMBRE para obtener partner_id. USAR PRIMERO cuando el usuario menciona un cliente por nombre y necesitas su ID para otras operaciones.",
+            tags=["client", "search", "odoo", "requires_name"]
         ),
         AgentSkill(
             id="get_client_info",
             name="get_client_info",
-            description="Obtener información y estadísticas del cliente",
-            tags=["client", "information", "statistics", "odoo"]
+            description="Información completa y estadísticas de un cliente: facturas, montos, ratios de pago, riesgo. REQUIERE partner_id.",
+            tags=["client", "information", "statistics", "odoo", "requires_id"]
         ),
         AgentSkill(
             id="get_client_invoices",
             name="get_client_invoices",
-            description="Obtener facturas del cliente",
-            tags=["client", "invoice", "odoo"]
+            description="Listado de facturas de un cliente específico con filtros (pagadas, pendientes, límite). REQUIERE partner_id.",
+            tags=["client", "invoice", "odoo", "requires_id"]
         ),
         AgentSkill(
             id="get_invoice_by_name",
             name="get_invoice_by_name",
-            description="Buscar factura por nombre",
-            tags=["invoice", "search", "odoo"]
+            description="Buscar factura por nombre (ej: 'INV-001'). Usar cuando el usuario menciona una factura específica por su código.",
+            tags=["invoice", "search", "odoo", "requires_name"]
         ),
         AgentSkill(
             id="get_overdue_invoices",
             name="get_overdue_invoices",
-            description="Obtener facturas vencidas",
-            tags=["invoice", "overdue", "odoo"]
+            description="Facturas vencidas de TODOS los clientes ordenadas por urgencia. NO requiere IDs, es consulta global.",
+            tags=["invoice", "overdue", "odoo", "global"]
         ),
         AgentSkill(
             id="get_upcoming_due_invoices",
             name="get_upcoming_due_invoices",
-            description="Obtener facturas próximas a vencer",
-            tags=["invoice", "upcoming", "due", "odoo"]
+            description="Facturas próximas a vencer para gestión preventiva. NO requiere IDs, es consulta global.",
+            tags=["invoice", "upcoming", "due", "odoo", "global"]
         ),
         AgentSkill(
             id="get_invoices_by_period",
             name="get_invoices_by_period",
-            description="Obtener facturas por período de fechas",
-            tags=["invoice", "period", "dates", "odoo"]
+            description="Facturas emitidas en un período específico (fechas). partner_id OPCIONAL para filtrar por cliente.",
+            tags=["invoice", "period", "dates", "odoo", "optional_id"]
         ),
         AgentSkill(
             id="check_connection",
             name="check_connection",
-            description="Verificar conexión con Odoo",
-            tags=["connection", "odoo", "verification"]
+            description="Verificar conexión con Odoo. Usar solo si hay problemas de conectividad.",
+            tags=["connection", "odoo", "verification", "diagnostic"]
         ),
     ]
 )

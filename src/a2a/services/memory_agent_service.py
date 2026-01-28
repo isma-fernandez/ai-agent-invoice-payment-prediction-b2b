@@ -28,26 +28,26 @@ agent_card = AgentCard(
         AgentSkill(
             id="save_client_note",
             name="save_client_note",
-            description="Guarda una nota permanente sobre un cliente",
-            tags=["memory", "note", "client", "persistence"]
+            description="Guardar nota permanente sobre un cliente. Usar cuando el usuario dice 'recuerda que...', 'anota que...'. REQUIERE partner_id.",
+            tags=["memory", "note", "client", "persistence", "requires_id"]
         ),
         AgentSkill(
             id="get_client_notes",
             name="get_client_notes",
-            description="Recupera las notas guardadas de un cliente",
-            tags=["memory", "note", "client", "retrieval"]
+            description="Recuperar notas guardadas de un cliente específico. REQUIERE partner_id.",
+            tags=["memory", "note", "client", "retrieval", "requires_id"]
         ),
         AgentSkill(
             id="save_alert",
             name="save_alert",
-            description="Guarda una alerta importante que requiere atención",
-            tags=["memory", "alert", "persistence", "notification"]
+            description="Guardar alerta importante que requiere atención. partner_id OPCIONAL si la alerta es sobre un cliente específico.",
+            tags=["memory", "alert", "persistence", "notification", "optional_id"]
         ),
         AgentSkill(
             id="get_active_alerts",
             name="get_active_alerts",
-            description="Recupera las alertas activas del sistema",
-            tags=["memory", "alert", "active", "retrieval"]
+            description="Recuperar alertas activas del sistema. NO requiere IDs, es consulta global.",
+            tags=["memory", "alert", "active", "retrieval", "global"]
         ),
     ]
 )

@@ -29,56 +29,56 @@ agent_card = AgentCard(
         AgentSkill(
             id="predict_invoice_risk",
             name="predict_invoice_risk",
-            description="Predice el riesgo de impago de una factura existente",
-            tags=["prediction", "risk", "invoice", "payment"]
+            description="Predice riesgo de impago de una factura existente con modelo ML. Genera gráfico donut de probabilidades. REQUIERE invoice_id.",
+            tags=["prediction", "risk", "invoice", "payment", "requires_id"]
         ),
         AgentSkill(
             id="predict_hypothetical_invoice",
             name="predict_hypothetical_invoice",
-            description="Predice el riesgo de una factura hipotética para un cliente",
-            tags=["prediction", "risk", "hypothetical", "invoice"]
+            description="Predice riesgo de una factura hipotética para escenarios futuros. REQUIERE partner_id y amount_eur.",
+            tags=["prediction", "risk", "hypothetical", "invoice", "requires_id"]
         ),
         AgentSkill(
             id="get_high_risk_clients",
             name="get_high_risk_clients",
-            description="Obtiene los clientes con mayor riesgo de impago",
-            tags=["risk", "client", "ranking", "analysis"]
+            description="Ranking de clientes con mayor riesgo de impago (risk_score 0-100). NO requiere IDs, es consulta global.",
+            tags=["risk", "client", "ranking", "analysis", "global"]
         ),
         AgentSkill(
             id="compare_clients",
             name="compare_clients",
-            description="Compara varios clientes en términos de riesgo y comportamiento de pago",
-            tags=["comparison", "client", "risk", "behavior"]
+            description="Compara estadísticas de pago entre varios clientes específicos. REQUIERE lista de partner_ids (mínimo 2).",
+            tags=["comparison", "client", "risk", "behavior", "requires_ids"]
         ),
         AgentSkill(
             id="get_aging_report",
             name="get_aging_report",
-            description="Genera un informe de antigüedad de deuda (global o por cliente)",
-            tags=["aging", "debt", "report", "analysis"]
+            description="Informe de antigüedad de deuda en buckets (0-30, 31-60, 61-90, >90 días). partner_id OPCIONAL: sin ID es global, con ID es para ese cliente.",
+            tags=["aging", "debt", "report", "analysis", "optional_id"]
         ),
         AgentSkill(
             id="get_portfolio_summary",
             name="get_portfolio_summary",
-            description="Obtiene un resumen de la cartera completa con métricas agregadas",
-            tags=["portfolio", "summary", "metrics", "analysis"]
+            description="Resumen ejecutivo de la cartera: total pendiente, total vencido, DSO, métricas agregadas. NO requiere IDs, es consulta global.",
+            tags=["portfolio", "summary", "metrics", "analysis", "global"]
         ),
         AgentSkill(
             id="get_client_trend",
             name="get_client_trend",
-            description="Analiza la tendencia de pago de un cliente a lo largo del tiempo",
-            tags=["trend", "client", "evolution", "analysis"]
+            description="Analiza tendencia de comportamiento de pago de un cliente (mejorando/empeorando/estable). REQUIERE partner_id.",
+            tags=["trend", "client", "evolution", "analysis", "requires_id"]
         ),
         AgentSkill(
             id="get_deteriorating_clients",
             name="get_deteriorating_clients",
-            description="Identifica clientes cuyo comportamiento de pago está empeorando",
-            tags=["deterioration", "client", "alert", "analysis"]
+            description="Identifica clientes cuyo comportamiento de pago está EMPEORANDO respecto al histórico. NO requiere IDs, es consulta global.",
+            tags=["deterioration", "client", "alert", "analysis", "global"]
         ),
         AgentSkill(
             id="generate_chart",
             name="generate_chart",
-            description="Genera gráficos visuales para mostrar datos (barras, líneas, donut, etc.)",
-            tags=["chart", "visualization", "graph", "data"]
+            description="Genera gráficos personalizados (barras, líneas, donut). Las otras herramientas ya generan sus propios gráficos automáticamente.",
+            tags=["chart", "visualization", "graph", "data", "internal"]
         ),
     ]
 )
