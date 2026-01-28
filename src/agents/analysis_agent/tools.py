@@ -117,7 +117,7 @@ async def get_high_risk_clients(limit: int = None) -> str:
         return "No se encontraron clientes de alto riesgo."
     
     chart_clients = clients[:10]
-    labels = [c.partner_name[:25] for c in chart_clients]
+    labels = [c.name[:25] for c in chart_clients]
     values = [c.risk_score for c in chart_clients]
     
     chart_id = await chart_generator.create_chart(
@@ -152,7 +152,7 @@ async def compare_clients(partner_ids: list[int]) -> str:
     if not clients:
         return "No se encontraron los clientes especificados."
     
-    labels = [c.partner_name[:25] for c in clients]
+    labels = [c.name[:25] for c in clients]
     values = [c.risk_score for c in clients]
     
     chart_id = await chart_generator.create_chart(
@@ -311,7 +311,7 @@ async def get_deteriorating_clients(limit: int = 10, min_invoices: int = 5) -> s
         return "No se encontraron clientes con deterioro significativo."
     
     chart_clients = clients[:10]
-    labels = [c.partner_name[:25] for c in chart_clients]
+    labels = [c.name[:25] for c in chart_clients]
     values = [abs(c.change_on_time_ratio * 100) for c in chart_clients]
     
     chart_id = await chart_generator.create_chart(
