@@ -197,3 +197,22 @@ o
 []
 
 NO incluyas explicaciones, SOLO el JSON."""
+
+
+FINAL_ANSWER_PROMPT = """Genera una respuesta para el usuario basándote en los datos recopilados.
+
+HISTORIAL DE CONVERSACIÓN:
+{conversation_history}
+
+PREGUNTA DEL USUARIO:
+{user_query}
+
+DATOS RECOPILADOS DE LOS AGENTES:
+{collected_data}
+
+INSTRUCCIONES:
+- Responde de forma clara y profesional
+- Usa los datos proporcionados, NO inventes información
+- Si hay datos numéricos, preséntalos de forma estructurada
+- NO incluyas referencias internas como "[DataAgent]" o "[AnalysisAgent]"
+- Responde en español"""
