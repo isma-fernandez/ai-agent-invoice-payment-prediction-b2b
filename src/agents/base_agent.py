@@ -1,3 +1,4 @@
+import json
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_mistralai import ChatMistralAI
@@ -82,10 +83,26 @@ class BaseAgent:
         return await self.graph.ainvoke({"messages": messages})
 
     def extract_final_response(self, result: SubAgentState) -> str:
-        """Método para extraer la última respuesta del agente"""
+        """Método para extraer la última respuesta del agente y los gráficos de las tools."""
+        # Extraer gráficos de ToolMessages
+        chart_jsons = []
+        for msg in result["messages"]:
+            if isinstance(msg, ToolMessage) and msg.content:
+                content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                temp = content
+                while "CHART_JSON:" in temp:
+                    idx = temp.find("CHART_JSON:")
+                    json_start = idx + len("CHART_JSON:")
+                    try:
+                        chart_obj, end = json.JSONDecoder().raw_decode(temp[json_start:])
+                        chart_jsons.append(json.dumps(chart_obj))
+                        temp = temp[json_start + end:]
+                    except json.JSONDecodeError:
+                        break
+        # Extraer respuesta del AIMessage
+        text_response = ""
         for msg in reversed(result["messages"]):
             if isinstance(msg, AIMessage) and msg.content:
-                # Tratar donde content es lista
                 content = msg.content
                 if isinstance(content, list):
                     text_parts = []
@@ -98,5 +115,11 @@ class BaseAgent:
 
                 if content and content.strip():
                     if not getattr(msg, 'tool_calls', None):
-                        return content.strip()
-        return ""
+                        text_response = content.strip()
+                        break
+        # Combinar respuesta con gráficos
+        if chart_jsons:
+            charts_str = " ".join([f"CHART_JSON:{cj}" for cj in chart_jsons])
+            return f"{text_response} {charts_str}"
+        
+        return text_response
