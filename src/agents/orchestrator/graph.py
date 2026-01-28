@@ -5,10 +5,26 @@ from langgraph.graph import StateGraph, START, END
 from langchain_mistralai import ChatMistralAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import httpx
+
 from src.agents.state import AgentState
 from src.config.settings import settings
 from src.a2a.client import A2AAgentClient
 from .prompts import ROUTER_PROMPT, FINAL_ANSWER_PROMPT
+
+
+def llm_retry():
+    """Decorador para retry con backoff exponencial en llamadas al LLM."""
+    return retry(
+        retry=retry_if_exception_type((httpx.HTTPStatusError,)),
+        wait=wait_exponential(multiplier=1, min=2, max=60),
+        stop=stop_after_attempt(5),
+        before_sleep=lambda retry_state: print(
+            f"[LLM Retry] Rate limit. Reintentando en {retry_state.next_action.sleep}s... "
+            f"(intento {retry_state.attempt_number}/5)"
+        )
+    )
 
 
 class Orchestrator:
@@ -21,10 +37,13 @@ class Orchestrator:
             temperature=0,
             api_key=settings.API_MISTRAL_KEY
         )
+        self._llm_invoke = llm_retry()(self.llm.invoke)
         # Clientes A2A
-        self.data_agent_client = A2AAgentClient(settings.A2A_DATA_AGENT_URL)
-        self.analysis_agent_client = A2AAgentClient(settings.A2A_ANALYSIS_AGENT_URL)
-        self.memory_agent_client = A2AAgentClient(settings.A2A_MEMORY_AGENT_URL)
+        self._agent_clients = {
+            "data_agent": A2AAgentClient(settings.A2A_DATA_AGENT_URL),
+            "analysis_agent": A2AAgentClient(settings.A2A_ANALYSIS_AGENT_URL),
+            "memory_agent": A2AAgentClient(settings.A2A_MEMORY_AGENT_URL),
+        }
         self.checkpointer = MemorySaver()
         self.graph = self._build_graph()
         self._agent_cards: dict[str, dict] = {}
@@ -40,13 +59,7 @@ class Orchestrator:
     
     async def _fetch_agent_cards(self):
         """Obtiene las AgentCards de todos los subagentes via A2A."""
-        agents = {
-            "data_agent": self.data_agent_client,
-            "analysis_agent": self.analysis_agent_client,
-            "memory_agent": self.memory_agent_client,
-        }
-        
-        for name, client in agents.items():
+        for name, client in self._agent_clients.items():
             card = await client.get_agent_card()
             if card:
                 self._agent_cards[name] = card
@@ -116,29 +129,31 @@ class Orchestrator:
             user_query=user_query
         )
 
-        response = self.llm.invoke([
+        response = self._llm_invoke([
             SystemMessage(content="Responde solo con JSON válido."),
             HumanMessage(content=prompt)
         ])
 
-        # Parsear la respuesta JSON
+        #formato [{"agent": "...", "task": "..."}]
         try:
             content = response.content.strip()
-            # Limpiar posibles backticks de markdown
             content = re.sub(r'^```json\s*', '', content)
             content = re.sub(r'\s*```$', '', content)
-            agent_plan = json.loads(content)
-            if not isinstance(agent_plan, list):
-                agent_plan = []
+            raw_plan = json.loads(content)
+            
+            agent_plan = [
+                {"agent": item["agent"], "task": item.get("task", "")}
+                for item in raw_plan[:self.MAX_AGENTS_PER_PLAN]
+                if isinstance(item, dict) and "agent" in item
+            ]
         except (json.JSONDecodeError, Exception):
             agent_plan = []
 
-        # Limitar el plan
-        agent_plan = agent_plan[:self.MAX_AGENTS_PER_PLAN]
-
         # DEBUG
         print(f"\n{'=' * 50}")
-        print(f"ROUTER - Plan: {agent_plan}")
+        print(f"ROUTER - Plan:")
+        for step in agent_plan:
+            print(f"  → {step['agent']}: {step['task'][:60]}...")
         print(f"Query: {user_query}")
         print(f"Context IDs: {context_ids}")
         print(f"{'=' * 50}\n")
@@ -155,7 +170,7 @@ class Orchestrator:
         return "execute" if plan else "finish"
 
     async def _executor(self, state: AgentState) -> dict:
-        """Ejecuta el agente actual del plan."""
+        """Ejecuta el agente actual del plan con su tarea específica."""
         plan = state.get("agent_plan", [])
         step = state.get("current_step", 0)
         collected = state.get("collected_data", []).copy()
@@ -163,25 +178,19 @@ class Orchestrator:
         if step >= len(plan):
             return {"current_step": step}
 
-        agent_name = plan[step]
-        user_query = state.get("user_query", "")
+        current_step = plan[step]
+        agent_name = current_step["agent"]
+        task = current_step["task"]  # Tarea específica del router
         messages = state.get("messages", [])
 
-        context = self._build_context_for_subagent(user_query, collected, messages)
+        context = self._build_context_for_subagent(agent_name, task, collected, messages)
 
-        # Modificado para usar clientes A2A
-        if agent_name == "data_agent":
-            response = await self.data_agent_client.process_message(context)
+        client = self._agent_clients.get(agent_name)
+        if client:
+            response = await client.process_message(context)
             if response:
-                collected.append(f"[DataAgent]: {response}")
-        elif agent_name == "analysis_agent":
-            response = await self.analysis_agent_client.process_message(context)
-            if response:
-                collected.append(f"[AnalysisAgent]: {response}")
-        elif agent_name == "memory_agent":
-            response = await self.memory_agent_client.process_message(context)
-            if response:
-                collected.append(f"[MemoryAgent]: {response}")
+                display_name = agent_name.replace("_", " ").title().replace(" ", "")
+                collected.append(f"[{display_name}]: {response}")
 
         return {
             "collected_data": collected,
@@ -194,27 +203,24 @@ class Orchestrator:
         step = state.get("current_step", 0)
         return "continue" if step < len(plan) else "done"
 
-    def _build_context_for_subagent(self, user_query: str, collected: list, messages: list) -> str:
-        """Contexto mínimo y limpio para el subagente."""
+    def _build_context_for_subagent(self, agent_name: str, task: str, collected: list, messages: list) -> str:
+        """Construye contexto con la tarea específica del router."""
         context_parts = []
 
         # Combinar IDs del historial Y del collected_data actual
         context_ids = self._extract_context_ids(messages)
         collected_ids = self._extract_ids_from_collected(collected)
-
         all_ids = {**context_ids, **collected_ids}
 
         if all_ids:
-            context_parts.append("IDs DISPONIBLES (usar estos):")
+            context_parts.append("IDs DISPONIBLES:")
             for name, pid in all_ids.items():
                 clean_name = name.replace('"', '').replace("'", "").strip()
                 context_parts.append(f"- {clean_name}: partner_id = {pid}")
             context_parts.append("")
 
-        # Consulta
-        context_parts.append(f"SOLICITUD: {user_query}")
-
-        context_parts.append("\nNO inventes IDs. Usa solo los proporcionados arriba.")
+        context_parts.append(f"TAREA: {task}")
+        context_parts.append("\nEjecuta la tarea usando tus herramientas. NO inventes IDs.")
 
         return "\n".join(context_parts)
 
@@ -316,7 +322,7 @@ class Orchestrator:
         )
 
         if not collected:
-            response = self.llm.invoke([
+            response = self._llm_invoke([
                 SystemMessage(content=system_instruction),
                 HumanMessage(content=f"Historial: {history_str}\n\nPregunta: {user_query}")
             ])
@@ -329,7 +335,7 @@ class Orchestrator:
                 collected_data=collected_str
             )
 
-            response = self.llm.invoke([
+            response = self._llm_invoke([
                 SystemMessage(content=system_instruction),
                 HumanMessage(content=prompt)
             ])
@@ -344,8 +350,14 @@ class Orchestrator:
 
     async def run(self, request: str, thread_id: str) -> str:
         config = {"configurable": {"thread_id": thread_id}}
+        
+        # Recuperar historial existente
+        existing_state = self.graph.get_state(config)
+        existing_messages = []
+        if existing_state and existing_state.values:
+            existing_messages = existing_state.values.get("messages", [])
         initial_state = {
-            "messages": [HumanMessage(content=request)],
+            "messages": existing_messages + [HumanMessage(content=request)],
             "user_query": request,
             "agent_plan": [],
             "current_step": 0,

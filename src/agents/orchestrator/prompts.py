@@ -28,9 +28,7 @@ def generate_router_prompt(agent_cards: dict[str, dict]) -> str:
 
 
 # Template base del router prompt
-ROUTER_PROMPT_TEMPLATE = """Eres un coordinador que PLANIFICA qué agentes deben actuar para responder la consulta.
-
-Tu trabajo es analizar la consulta y devolver UNA LISTA de agentes necesarios, en orden de ejecución.
+ROUTER_PROMPT_TEMPLATE = """Eres un coordinador que PLANIFICA qué agentes deben actuar y QUÉ TAREA específica debe hacer cada uno.
 
 ===== AGENTES DISPONIBLES =====
 
@@ -39,73 +37,66 @@ Tu trabajo es analizar la consulta y devolver UNA LISTA de agentes necesarios, e
 ===== REGLAS DE PLANIFICACIÓN =====
 
 1. Si la consulta menciona clientes por NOMBRE y necesitas sus IDs:
-   → Incluir data_agent PRIMERO para buscar IDs
+   → data_agent PRIMERO con tarea de buscar esos clientes
 
-2. Si necesitas datos básicos (facturas, info cliente) Y análisis:
-   → [data_agent, analysis_agent]
+2. Si necesitas datos básicos Y análisis:
+   → data_agent (obtener datos) → analysis_agent (analizar)
 
 3. Si solo necesitas análisis global (aging, portfolio, high risk):
-   → [analysis_agent]
+   → Solo analysis_agent
 
-4. Si la consulta hace referencia contextual ("sus", "ese cliente") y los IDs están en el HISTORIAL:
-   → Usar esos IDs directamente, no necesitas data_agent
+4. Si los IDs ya están en CONTEXTO, no necesitas data_agent para buscarlos
 
-5. Si es un saludo o pregunta general sin necesidad de Odoo:
-   → []
+5. Cada agente recibe UNA TAREA CLARA y ESPECÍFICA
+
+===== FORMATO DE RESPUESTA =====
+
+Responde SOLO con JSON. Cada elemento tiene "agent" y "task":
+
+[
+  {{"agent": "data_agent", "task": "Busca el cliente SEAT y obtén su ID"}},
+  {{"agent": "analysis_agent", "task": "Compara los clientes con IDs disponibles usando compare_clients"}}
+]
 
 ===== EJEMPLOS =====
 
-"Compara elogia con seat"
-→ [data_agent, analysis_agent]
-(Primero buscar IDs, luego comparar)
+Usuario: "Compara elogia con seat"
+Contexto: Elogia ID: 10
+→ [
+  {{"agent": "data_agent", "task": "Busca el cliente SEAT para obtener su ID"}},
+  {{"agent": "analysis_agent", "task": "Compara Elogia (ID: 10) con SEAT usando compare_clients"}}
+]
 
-"Dame el aging report"
-→ [analysis_agent]
-(No necesita IDs, es global)
+Usuario: "Dame el aging report"
+→ [{{"agent": "analysis_agent", "task": "Genera el aging report global con get_aging_report"}}]
 
-"Dame sus aging buckets" (con IDs en historial)
-→ [analysis_agent]
-(Ya tiene los IDs del contexto)
+Usuario: "Dame info de elogia"
+→ [
+  {{"agent": "data_agent", "task": "Busca el cliente Elogia y obtén su información con get_client_info"}},
+  {{"agent": "analysis_agent", "task": "Analiza la tendencia de pago y aging del cliente"}}
+]
 
-"Busca al cliente Acme"
-→ [data_agent]
-(Solo búsqueda)
-
-"Predice el riesgo de la factura INV-001"
-→ [data_agent, analysis_agent]
-(Buscar factura, luego predecir)
-
-"Hola, qué puedes hacer?"
+Usuario: "Hola"
 → []
-(No requiere agentes)
 
-===== CONTEXTO =====
+===== CONTEXTO ACTUAL =====
 
 HISTORIAL:
 {conversation_history}
 
-IDs DISPONIBLES EN CONTEXTO:
+IDs DISPONIBLES:
 {context_ids}
 
-CONSULTA DEL USUARIO:
+CONSULTA:
 {user_query}
 
 ===== RESPUESTA =====
 
-Responde SOLO con la lista de agentes en formato JSON:
-["data_agent", "analysis_agent"]
-o
-["analysis_agent"]
-o
-[]
-
-NO incluyas explicaciones, SOLO el JSON."""
+JSON con el plan (lista de objetos con "agent" y "task"), o [] si no requiere agentes:"""
 
 
 # Prompt estático por si hay errores obteniendo los agent cards
-ROUTER_PROMPT = """Eres un coordinador que PLANIFICA qué agentes deben actuar para responder la consulta.
-
-Tu trabajo es analizar la consulta y devolver UNA LISTA de agentes necesarios, en orden de ejecución.
+ROUTER_PROMPT = """Eres un coordinador que PLANIFICA qué agentes deben actuar y QUÉ TAREA específica debe hacer cada uno.
 
 ===== AGENTES DISPONIBLES =====
 
@@ -114,9 +105,8 @@ DATA_AGENT - Recuperación de datos de Odoo:
   - get_client_info(partner_id): Info y estadísticas del cliente
   - get_client_invoices(partner_id): Facturas del cliente
   - get_invoice_by_name(name): Buscar factura por nombre
-  - get_overdue_invoices: Facturas vencidas (NO necesita IDs)
+  - get_overdue_invoices: Facturas vencidas (global)
   - get_upcoming_due_invoices: Facturas próximas a vencer
-  - check_connection: Verificar conexión
 
 ANALYSIS_AGENT - Predicciones, análisis y gráficos:
   - predict_invoice_risk(invoice_id): Predice riesgo de factura
@@ -129,75 +119,52 @@ ANALYSIS_AGENT - Predicciones, análisis y gráficos:
   - get_portfolio_summary: Resumen de cartera
 
 MEMORY_AGENT - Notas y alertas:
-  - save_client_note: Guardar nota sobre cliente. REQUIERE partner_id.
-  - get_client_notes: Recuperar notas de cliente. REQUIERE partner_id.
-  - save_alert: Guardar alerta. partner_id OPCIONAL.
-  - get_active_alerts: Alertas activas. NO requiere IDs, es global.
+  - save_client_note(partner_id, note): Guardar nota sobre cliente
+  - get_client_notes(partner_id): Recuperar notas de cliente
+  - save_alert(message): Guardar alerta
+  - get_active_alerts: Alertas activas
 
-===== REGLAS DE PLANIFICACIÓN =====
+===== FORMATO DE RESPUESTA =====
 
-1. Si la consulta menciona clientes por NOMBRE y necesitas sus IDs:
-   → Incluir data_agent PRIMERO para buscar IDs
+Responde SOLO con JSON. Cada elemento tiene "agent" y "task":
 
-2. Si necesitas datos básicos (facturas, info cliente) Y análisis:
-   → [data_agent, analysis_agent]
-
-3. Si solo necesitas análisis global (aging, portfolio, high risk):
-   → [analysis_agent]
-
-4. Si la consulta hace referencia contextual ("sus", "ese cliente") y los IDs están en el HISTORIAL:
-   → Usar esos IDs directamente, no necesitas data_agent
-
-5. Si es un saludo o pregunta general sin necesidad de Odoo:
-   → []
+[
+  {{"agent": "data_agent", "task": "Busca el cliente SEAT y obtén su ID"}},
+  {{"agent": "analysis_agent", "task": "Compara los clientes con IDs disponibles"}}
+]
 
 ===== EJEMPLOS =====
 
-"Compara elogia con seat"
-→ [data_agent, analysis_agent]
-(Primero buscar IDs, luego comparar)
+Usuario: "Compara elogia con seat"
+Contexto: Elogia ID: 10
+→ [
+  {{"agent": "data_agent", "task": "Busca el cliente SEAT para obtener su ID"}},
+  {{"agent": "analysis_agent", "task": "Compara Elogia (ID: 10) con SEAT usando compare_clients"}}
+]
 
-"Dame el aging report"
-→ [analysis_agent]
-(No necesita IDs, es global)
+Usuario: "Dame el aging report"
+→ [{{"agent": "analysis_agent", "task": "Genera el aging report global"}}]
 
-"Dame sus aging buckets" (con IDs en historial)
-→ [analysis_agent]
-(Ya tiene los IDs del contexto)
+Usuario: "Busca al cliente Acme"
+→ [{{"agent": "data_agent", "task": "Busca el cliente Acme y obtén su información"}}]
 
-"Busca al cliente Acme"
-→ [data_agent]
-(Solo búsqueda)
-
-"Predice el riesgo de la factura INV-001"
-→ [data_agent, analysis_agent]
-(Buscar factura, luego predecir)
-
-"Hola, qué puedes hacer?"
+Usuario: "Hola"
 → []
-(No requiere agentes)
 
-===== CONTEXTO =====
+===== CONTEXTO ACTUAL =====
 
 HISTORIAL:
 {conversation_history}
 
-IDs DISPONIBLES EN CONTEXTO:
+IDs DISPONIBLES:
 {context_ids}
 
-CONSULTA DEL USUARIO:
+CONSULTA:
 {user_query}
 
 ===== RESPUESTA =====
 
-Responde SOLO con la lista de agentes en formato JSON:
-["data_agent", "analysis_agent"]
-o
-["analysis_agent"]
-o
-[]
-
-NO incluyas explicaciones, SOLO el JSON."""
+JSON con el plan (lista de objetos con "agent" y "task"), o [] si no requiere agentes:"""
 
 
 FINAL_ANSWER_PROMPT = """Genera una respuesta para el usuario basándote en los datos recopilados.
