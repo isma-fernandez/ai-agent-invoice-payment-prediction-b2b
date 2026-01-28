@@ -27,6 +27,43 @@ class Orchestrator:
         self.memory_agent_client = A2AAgentClient(settings.A2A_MEMORY_AGENT_URL)
         self.checkpointer = MemorySaver()
         self.graph = self._build_graph()
+        self._agent_cards: dict[str, dict] = {}
+        self._router_prompt: str | None = None
+    
+    async def initialize(self):
+        """Inicializa el orchestrator obteniendo las AgentCards de los subagentes.
+        
+        Debe llamarse antes de usar el orchestrator para que el router
+        tenga información actualizada de las capacidades de cada agente.
+        """
+        await self._fetch_agent_cards()
+    
+    async def _fetch_agent_cards(self):
+        """Obtiene las AgentCards de todos los subagentes via A2A."""
+        agents = {
+            "data_agent": self.data_agent_client,
+            "analysis_agent": self.analysis_agent_client,
+            "memory_agent": self.memory_agent_client,
+        }
+        
+        for name, client in agents.items():
+            card = await client.get_agent_card()
+            if card:
+                self._agent_cards[name] = card
+                print(f"[Orchestrator] AgentCard obtenida: {name} ({len(card.get('skills', []))} skills)")
+            else:
+                print(f"[Orchestrator] No se pudo obtener AgentCard de {name}")
+        
+        # Generar el prompt
+        if self._agent_cards:
+            from .prompts import generate_router_prompt
+            self._router_prompt = generate_router_prompt(self._agent_cards)
+    
+    def get_router_prompt(self) -> str:
+        """Devuelve el router prompt."""
+        if self._router_prompt:
+            return self._router_prompt
+        return ROUTER_PROMPT
 
     def _build_graph(self):
         builder = StateGraph(AgentState)
@@ -72,7 +109,8 @@ class Orchestrator:
         if not context_ids_str:
             context_ids_str = "Ninguno disponible"
 
-        prompt = ROUTER_PROMPT.format(
+        router_prompt_template = self.get_router_prompt()
+        prompt = router_prompt_template.format(
             conversation_history=history_str,
             context_ids=context_ids_str,
             user_query=user_query

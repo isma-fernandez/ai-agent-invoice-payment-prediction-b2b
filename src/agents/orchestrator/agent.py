@@ -20,6 +20,8 @@ class FinancialAgent:
         set_data_manager(dm)
 
         self._orchestrator = Orchestrator()
+
+        await self._orchestrator.initialize()
         self._initialized = True
 
     async def process_request(self, request: str, thread_id: str) -> str:
