@@ -89,7 +89,8 @@ async def init_resources():
     """Inicializa los recursos necesarios para el servicio."""
     global _data_manager
     if _data_manager is None:
-        _data_manager = DataManager()
+        # TODO: Eliminar cutoff_date en producción
+        _data_manager = DataManager(cutoff_date="2025-01-01")
         await _data_manager.connect()
         set_data_manager(_data_manager)
     
