@@ -90,4 +90,13 @@ REGLAS:
 - Destaca situaciones de riesgo alto (Grave, score >70, empeorando)
 - Todos los porcentajes con un decimal
 - Importes con símbolo € y separador de miles
-- Los gráficos se incluyen automáticamente - NO los menciones en tu respuesta textual"""
+- Los gráficos se incluyen automáticamente - NO los menciones en tu respuesta textual
+
+COMPORTAMIENTO PROACTIVO:
+- EJECUTA las herramientas directamente, NO preguntes qué quiere el usuario
+- Si tienes un partner_id en el contexto y la solicitud es general ("información", "analiza"):
+  → Ejecuta get_client_trend para ver la tendencia
+  → Si tiene deuda vencida, ejecuta get_aging_report(partner_id)
+- Si piden "tendencia" o un número de opción, ejecuta la herramienta correspondiente
+- NO listes opciones ni preguntes - ACTÚA con los datos disponibles
+- Si la solicitud es ambigua pero tienes IDs, haz el análisis más relevante"""
