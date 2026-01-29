@@ -2,7 +2,7 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Dependenciaks de psycopg2 y para el servidor MCP
+# Dependencias de psycopg2 y para el servidor MCP
 RUN apt-get update && apt-get install -y libpq-dev gcc
 RUN pip install --no-cache-dir \
     fastmcp \
@@ -10,17 +10,18 @@ RUN pip install --no-cache-dir \
     pydantic \
     pydantic-settings
 
-# Archivos necesarios para el servidor MCP
-COPY src/mcp/memory_agent_server.py src/mcp/
-COPY src/agents/store.py src/agents/
-COPY src/data/models.py src/data/
-COPY src/config/memory_mcp_settings.py src/config/
+# Copiar código compartido necesario
+COPY shared/models/domain.py shared/models/domain.py
+COPY shared/config/memory_mcp_settings.py shared/config/memory_mcp_settings.py
 
-# __init__.py vacíos, los de src tienen dependencias que no usa el servidor
-RUN touch src/__init__.py src/agents/__init__.py src/data/__init__.py src/config/__init__.py src/mcp/__init__.py
+# Copiar código del servicio MCP de memoria
+COPY services/memory_mcp/ services/memory_mcp/
+
+# __init__.py vacíos para los módulos
+RUN touch shared/__init__.py shared/models/__init__.py shared/config/__init__.py services/__init__.py
 
 ENV PYTHONPATH=/app
 
 EXPOSE 8100
 
-CMD ["fastmcp", "run", "src/mcp/memory_agent_server.py", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8100"]
+CMD ["fastmcp", "run", "services/memory_mcp/server.py", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8100"]
