@@ -53,9 +53,23 @@ async def get_active_alerts(limit: int = 10) -> list[dict]:
     return await client.get_active_alerts(limit)
 
 
+@tool
+async def delete_note(note_id: int) -> str:
+    """Elimina una nota o alerta por su ID.
+
+    Primero usa get_client_notes para obtener los IDs de las notas.
+
+    Args:
+        note_id: ID de la nota a eliminar.
+    """
+    client = get_memory_client()
+    return await client.delete_note(note_id)
+
+
 MEMORY_TOOLS = [
     save_client_note,
     get_client_notes,
     save_alert,
     get_active_alerts,
+    delete_note,
 ]

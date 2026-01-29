@@ -6,14 +6,13 @@ from shared.config.settings import settings
 def _parse_result(result):
     """Extrae el texto de un CallToolResult de fastmcp."""
     if result.is_error:
-        raise Exception(f"Error MCP: {result.content}")
-
-    text = result.content[0].text
-    
+        raise Exception(f"Error MCP: {result.content}")       
+    if not result.content:
+        return []   
+    text = result.content[0].text 
     # Si es json
     if text.startswith('[') or text.startswith('{'):
         return json.loads(text)
-    
     return text
 
 
@@ -71,6 +70,16 @@ class MemoryMCPClient:
                 {"limit": limit}
             )
             return _parse_result(result) or []
+
+    async def delete_note(self, note_id: int) -> str:
+        """Elimina una nota por su ID."""
+        client = await self._get_client()
+        async with client:
+            result = await client.call_tool(
+                "delete_note",
+                {"note_id": note_id}
+            )
+            return _parse_result(result)
 
 
 _memory_client: MemoryMCPClient | None = None

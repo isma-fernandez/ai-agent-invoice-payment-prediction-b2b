@@ -33,15 +33,24 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 
-def send_message(prompt: str, thread_id: str) -> str:
-    """Envía un mensaje al orchestrator y devuelve la respuesta."""
-    with httpx.Client(timeout=900.0) as client:  # 15 minutos
-        response = client.post(
-            f"{ORCHESTRATOR_URL}/chat",
+def stream_message(prompt: str, thread_id: str):
+    """Envía mensaje y procesa eventos SSE."""
+    with httpx.Client(timeout=900.0) as client:
+        with client.stream(
+            "POST",
+            f"{ORCHESTRATOR_URL}/chat/stream",
             json={"message": prompt, "thread_id": thread_id}
-        )
-        response.raise_for_status()
-        return response.json()["response"]
+        ) as response:
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if line.startswith("data: "):
+                    data = line[6:]
+                    if data == "OK":
+                        break
+                    try:
+                        yield json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
 
 
 if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
@@ -54,15 +63,41 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
         message_placeholder = st.empty()
 
         try:
-            status_placeholder.info("Procesando consulta...")
+            final_response = ""
+            streaming_text = ""
             
-            final_response = send_message(prompt, st.session_state.thread_id)
+            for event in stream_message(prompt, st.session_state.thread_id):
+                event_type = event.get("type")
+                
+                if event_type == "status":
+                    status_placeholder.info(event["message"])
+                
+                elif event_type == "plan":
+                    pass
+                
+                elif event_type == "progress":
+                    agent = event.get("agent", "")
+                    if agent == "data_agent":
+                        status_placeholder.info("Obteniendo datos...")
+                    elif agent == "analysis_agent":
+                        status_placeholder.info("Analizando...")
+                    elif agent == "memory_agent":
+                        status_placeholder.info("Consultando memoria...")
+                    else:
+                        status_placeholder.info("Procesando...")
+                
+                elif event_type == "token":
+                    status_placeholder.empty()
+                    streaming_text += event.get("content", "")
+                    message_placeholder.markdown(streaming_text + "▌")
+                
+                elif event_type == "complete":
+                    final_response = event["response"]
             
             status_placeholder.empty()
 
             if final_response:
                 clean_response = final_response.replace("CHART:CHART_JSON:", "CHART_JSON:")
-                # Extraer gráficos JSON de la respuesta
                 charts = []
                 while "CHART_JSON:" in clean_response:
                     idx = clean_response.find("CHART_JSON:")
@@ -90,7 +125,7 @@ if prompt := st.chat_input("Escribe tu consulta sobre facturación..."):
 
         except httpx.ConnectError:
             status_placeholder.empty()
-            st.error("No se puede conectar con el orchestrator. ¿Está corriendo Docker?")
+            st.error("No se puede conectar con el orchestrator.")
         except httpx.HTTPStatusError as e:
             status_placeholder.empty()
             st.error(f"Error del servidor: {e.response.status_code}")

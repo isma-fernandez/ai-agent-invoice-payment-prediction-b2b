@@ -348,6 +348,61 @@ class Orchestrator:
 
         return {"messages": [AIMessage(content=final_response)]}
 
+    async def _stream_final_answer(self, state: AgentState):
+        """Genera la respuesta final en streaming."""
+        collected = state.get("collected_data", [])
+        user_query = state.get("user_query", "")
+        messages = state.get("messages", [])
+        history_str = self._extract_conversation_history(messages)
+
+        # Extraer gráficos JSON
+        chart_jsons = []
+        cleaned_collected = []
+        for item in collected:
+            temp = item.replace("CHART:CHART_JSON:", "CHART_JSON:")
+            while "CHART_JSON:" in temp:
+                idx = temp.find("CHART_JSON:")
+                json_start = idx + len("CHART_JSON:")
+                try:
+                    chart_obj, end = json.JSONDecoder().raw_decode(temp[json_start:])
+                    chart_jsons.append(json.dumps(chart_obj))
+                    temp = temp[:idx] + temp[json_start + end:]
+                except:
+                    break
+            cleaned_collected.append(temp.strip())
+
+        system_instruction = (
+            "Eres un asistente financiero profesional. "
+            "Responde en español, sin emojis, de forma directa. "
+            "Adapta la extensión a la complejidad de la pregunta. "
+            "NO resumas datos numéricos. NO inventes datos."
+        )
+
+        if not collected:
+            msgs = [
+                SystemMessage(content=system_instruction),
+                HumanMessage(content=f"Historial: {history_str}\n\nPregunta: {user_query}")
+            ]
+        else:
+            collected_str = "\n".join(cleaned_collected)
+            prompt = FINAL_ANSWER_PROMPT.format(
+                conversation_history=history_str,
+                user_query=user_query,
+                collected_data=collected_str
+            )
+            msgs = [
+                SystemMessage(content=system_instruction),
+                HumanMessage(content=prompt)
+            ]
+
+        async for chunk in self.llm.astream(msgs):
+            if chunk.content:
+                yield {"type": "token", "content": chunk.content}
+
+        if chart_jsons:
+            charts_str = " ".join([f"CHART_JSON:{cj}" for cj in chart_jsons])
+            yield {"type": "charts", "content": charts_str}
+
     async def run(self, request: str, thread_id: str) -> str:
         config = {"configurable": {"thread_id": thread_id}}
         
@@ -372,14 +427,56 @@ class Orchestrator:
         return "No se pudo procesar tu solicitud."
 
     async def stream(self, request: str, thread_id: str):
+        """Procesa la solicitud emitiendo eventos de progreso."""
         config = {"configurable": {"thread_id": thread_id}}
-        initial_state = {
-            "messages": [HumanMessage(content=request)],
+        
+        existing_state = self.graph.get_state(config)
+        existing_messages = []
+        if existing_state and existing_state.values:
+            existing_messages = existing_state.values.get("messages", [])
+        
+        state = {
+            "messages": existing_messages + [HumanMessage(content=request)],
             "user_query": request,
             "agent_plan": [],
             "current_step": 0,
             "collected_data": []
         }
-
-        async for event in self.graph.astream_events(initial_state, config=config):
-            yield event
+        
+        # Generar plan
+        yield {"type": "status", "message": "Analizando consulta..."}
+        router_result = self._router(state)
+        state.update(router_result)
+        plan = state.get("agent_plan", [])
+        if plan:
+            yield {"type": "plan", "tasks": [step["task"] for step in plan]}
+        
+        # Ejecutar plan y anunciar progreso
+        for i, step in enumerate(plan):
+            yield {
+                "type": "progress",
+                "step": i + 1,
+                "total": len(plan),
+                "agent": step["agent"],
+                "task": step["task"]
+            }
+            state["current_step"] = i
+            executor_result = await self._executor(state)
+            state.update(executor_result)
+        
+        # Generación de respuesta final con streaming
+        yield {"type": "status", "message": "Generando respuesta..."}
+        
+        full_response = ""
+        async for event in self._stream_final_answer(state):
+            if event["type"] == "token":
+                full_response += event["content"]
+                yield event
+            elif event["type"] == "charts":
+                # gráficos al final
+                full_response += "\n\n" + event["content"]
+        
+        # Checkpointer
+        state["messages"] = state["messages"] + [AIMessage(content=full_response)]
+        self.graph.update_state(config, state)
+        yield {"type": "complete", "response": full_response}

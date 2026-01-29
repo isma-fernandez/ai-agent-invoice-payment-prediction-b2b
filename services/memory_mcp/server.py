@@ -91,5 +91,18 @@ async def get_active_alerts(limit: int = 10):
         for a in alerts
     ]
 
+@mcp.tool()
+async def delete_note(note_id: int):
+    """Elimina una nota o alerta por su ID.
+
+    Args:
+        note_id: ID de la nota a eliminar.
+    """
+    ms = get_ms()
+    deleted = ms.delete(note_id)
+    if deleted:
+        return f"Nota {note_id} eliminada correctamente"
+    return f"No se encontró la nota con ID {note_id}"
+
 if __name__ == "__main__":
     mcp.run()

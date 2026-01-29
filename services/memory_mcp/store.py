@@ -14,16 +14,15 @@ def _parse_datetime(value) -> datetime:
 
 
 def _row_to_memory(row) -> Memory:
-    """Convierte los datos obtenidos de la bsae de datos a
-    objeto Memory"""
+    """Convierte los datos obtenidos de la base de datos a objeto Memory"""
     return Memory(
         id=row[0],
         memory_type=MemoryType(row[1]),
         content=row[2],
         partner_id=row[3],
         partner_name=row[4],
-        created_at=datetime.fromisoformat(row[5]),
-        expires_at=datetime.fromisoformat(row[6]) if row[6] else None
+        created_at=_parse_datetime(row[5]),
+        expires_at=_parse_datetime(row[6])
     )
 
 
@@ -40,6 +39,23 @@ class MemoryStore:
             dbname=memory_settings.POSTGRES_DB
         )
         self.conn.autocommit = False
+        self._init_db()
+
+    def _init_db(self):
+        """Crea la tabla memories si no existe."""
+        with self.conn.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS memories (
+                    id SERIAL PRIMARY KEY,
+                    memory_type VARCHAR(50) NOT NULL,
+                    content TEXT NOT NULL,
+                    partner_id INTEGER,
+                    partner_name VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP
+                )
+            """)
+            self.conn.commit()
 
     def save(self, memory: Memory) -> int:
         """Guarda una memoria y devuelve su ID."""
