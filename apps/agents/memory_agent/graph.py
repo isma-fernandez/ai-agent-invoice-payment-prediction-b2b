@@ -23,6 +23,7 @@ class MemoryAgent:
         self.graph = self._build_graph()
 
     def _build_graph(self):
+        """Construye el grafo de LangGraph para el agente."""
         builder = StateGraph(SubAgentState)
         builder.add_node("agent", self._call_tools)
         builder.add_node("tools", self._run_tools)
@@ -34,11 +35,13 @@ class MemoryAgent:
         return builder.compile()
 
     async def _call_tools(self, state: SubAgentState):
+        """Invoca al LLM para decidir qué herramientas usar."""
         msgs = [SystemMessage(content=self.prompt)] + state["messages"]
         result = await self.llm.ainvoke(msgs)
         return {"messages": [result]}
 
     async def _run_tools(self, state: SubAgentState):
+        """Ejecuta las herramientas seleccionadas."""
         return await self.tool_node.ainvoke(state)
 
     async def _format_result(self, state: SubAgentState):
@@ -64,9 +67,25 @@ class MemoryAgent:
         return {"messages": [AIMessage(content=response)]}
 
     async def run(self, messages: list) -> SubAgentState:
+        """Ejecuta el agente con los mensajes proporcionados.
+        
+        Args:
+            messages: Lista de mensajes de entrada.
+            
+        Returns:
+            Estado final del agente.
+        """
         return await self.graph.ainvoke({"messages": messages})
 
     def extract_final_response(self, result: SubAgentState) -> str:
+        """Extrae la respuesta final del agente.
+        
+        Args:
+            result: Estado final del agente.
+            
+        Returns:
+            Texto de la respuesta.
+        """
         for msg in reversed(result["messages"]):
             if isinstance(msg, AIMessage) and msg.content:
                 if not getattr(msg, 'tool_calls', None):

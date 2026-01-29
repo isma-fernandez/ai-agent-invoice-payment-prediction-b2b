@@ -7,6 +7,7 @@ mcp = FastMCP("memory-agent-mcp")
 _memory_store = None
 
 def get_ms():
+    """Obtiene la instancia del almacén de memoria."""
     global _memory_store
     if _memory_store is None:
         _memory_store = MemoryStore()

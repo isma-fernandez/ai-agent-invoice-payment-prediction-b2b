@@ -13,6 +13,7 @@ def _parse_result(result):
 
 class PredictionMCPClient:
     """Cliente MCP para conectarse al servidor de predicción."""
+
     def __init__(self):
         self.server_url = settings.MCP_PREDICTION_URL
         self._client = None
@@ -44,7 +45,11 @@ class PredictionMCPClient:
 _prediction_client: PredictionMCPClient | None = None
 
 def get_prediction_client() -> PredictionMCPClient:
-    """Obtiene el cliente MCP de predicción."""
+    """Obtiene el cliente MCP de predicción.
+    
+    Returns:
+        Instancia del cliente de predicción.
+    """
     global _prediction_client
     if _prediction_client is None:
         _prediction_client = PredictionMCPClient()

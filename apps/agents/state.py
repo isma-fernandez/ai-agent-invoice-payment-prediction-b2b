@@ -3,6 +3,7 @@ from langgraph.graph import add_messages
 
 
 class AgentState(TypedDict):
+    """Estado del orquestador principal."""
     messages: Annotated[list, add_messages]
     user_query: str
     agent_plan: list[str]

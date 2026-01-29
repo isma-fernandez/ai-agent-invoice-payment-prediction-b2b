@@ -44,6 +44,12 @@ class BaseAgentExecutor(AgentExecutor):
             self.langgraph_agent = self.agent_factory()
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        """Procesa un mensaje A2A y envía la respuesta.
+        
+        Args:
+            context: Contexto de la petición A2A.
+            event_queue: Cola para enviar eventos de respuesta.
+        """
         await self.initialize()
 
         text_content = extract_text_from_message(context.message)
@@ -71,4 +77,5 @@ class BaseAgentExecutor(AgentExecutor):
         await event_queue.enqueue_event(response)
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        """Cancela la ejecución del agente."""
         pass

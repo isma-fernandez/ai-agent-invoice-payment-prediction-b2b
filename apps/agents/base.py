@@ -23,6 +23,7 @@ class BaseAgent:
         self.graph = self._build_graph()
 
     def _build_graph(self):
+        """Construye el grafo de LangGraph para el agente."""
         builder = StateGraph(SubAgentState)
         builder.add_node("agent", self._chatbot)
         builder.add_node("tools", self._run_tools)
@@ -66,20 +67,31 @@ class BaseAgent:
         return msgs
 
     async def _chatbot(self, state: SubAgentState):
+        """Nodo del grafo que invoca al LLM."""
         rearranged_msgs = self._prepare_messages_for_mistral(state["messages"])
         result = await self.llm.ainvoke(rearranged_msgs)
         return {"messages": [result]}
 
     async def _run_tools(self, state: SubAgentState):
+        """Nodo del grafo que ejecuta las herramientas."""
         return await self.tool_node.ainvoke(state)
 
     def _should_use_tools(self, state: SubAgentState) -> str:
+        """Decide si debe ejecutar herramientas o terminar."""
         last_message = state["messages"][-1]
         if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools"
         return "end"
 
     async def run(self, messages: list) -> SubAgentState:
+        """Ejecuta el agente con los mensajes proporcionados.
+        
+        Args:
+            messages: Lista de mensajes de entrada.
+            
+        Returns:
+            Estado final del agente con la respuesta.
+        """
         return await self.graph.ainvoke({"messages": messages})
 
     def extract_final_response(self, result: SubAgentState) -> str:

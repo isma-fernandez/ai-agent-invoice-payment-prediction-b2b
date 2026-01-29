@@ -86,7 +86,7 @@ _memory_client: MemoryMCPClient | None = None
 
 
 def get_memory_client() -> MemoryMCPClient:
-    """Obtiene el cliente MCP de memoria (singleton)."""
+    """Obtiene el cliente MCP de memoria."""
     global _memory_client
     if _memory_client is None:
         _memory_client = MemoryMCPClient()

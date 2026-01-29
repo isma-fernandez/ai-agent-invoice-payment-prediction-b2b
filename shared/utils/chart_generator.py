@@ -57,6 +57,7 @@ class ChartGenerator:
 
     def _create_bar_chart(self, data: dict, title: str,
                           show_values: bool, horizontal: bool) -> go.Figure:
+        """Crea un gráfico de barras."""
         labels = data.get('labels', [])
 
         if 'series' in data:
@@ -102,6 +103,7 @@ class ChartGenerator:
 
 
     def _create_line_chart(self, data: dict, title: str, show_values: bool) -> go.Figure:
+        """Crea un gráfico de líneas."""
         labels = data.get('labels', [])
         fig = go.Figure()
 
@@ -130,6 +132,7 @@ class ChartGenerator:
 
     def _create_pie_chart(self, data: dict, title: str,
                           show_values: bool, donut: bool) -> go.Figure:
+        """Crea un gráfico de tarta o donut."""
         labels = data.get('labels', [])
         values = data.get('values', [])
 

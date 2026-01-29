@@ -36,6 +36,7 @@ class OrchestratorExecutor(AgentExecutor):
         self.get_agent = get_agent_func
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        """Procesa un mensaje A2A y envía la respuesta."""
         text_content = extract_text_from_message(context.message)
 
         if not text_content:
@@ -52,6 +53,7 @@ class OrchestratorExecutor(AgentExecutor):
         await event_queue.enqueue_event(response)
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        """Cancela la ejecución del orquestador."""
         pass
 
 

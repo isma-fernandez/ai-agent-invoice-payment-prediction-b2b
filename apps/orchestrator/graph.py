@@ -28,6 +28,8 @@ def llm_retry():
 
 
 class Orchestrator:
+    """Orquestador principal que coordina la ejecución de sub-agentes."""
+
     MAX_AGENTS_PER_PLAN = 8
     MAX_HISTORY_MESSAGES = 10
 
@@ -79,6 +81,7 @@ class Orchestrator:
         return ROUTER_PROMPT
 
     def _build_graph(self):
+        """Construye el grafo de LangGraph con los nodos router, executor y final_answer."""
         builder = StateGraph(AgentState)
 
         builder.add_node("router", self._router)
@@ -285,6 +288,7 @@ class Orchestrator:
         return "\n".join(lines) if lines else "Sin historial previo."
 
     def _generate_final_answer(self, state: AgentState) -> dict:
+        """Genera la respuesta final sintetizando los datos recopilados."""
         collected = state.get("collected_data", [])
         user_query = state.get("user_query", "")
         messages = state.get("messages", [])
@@ -404,6 +408,15 @@ class Orchestrator:
             yield {"type": "charts", "content": charts_str}
 
     async def run(self, request: str, thread_id: str) -> str:
+        """Ejecuta una solicitud y devuelve la respuesta completa.
+        
+        Args:
+            request: Mensaje del usuario.
+            thread_id: ID de la conversación para mantener contexto.
+            
+        Returns:
+            Respuesta del asistente.
+        """
         config = {"configurable": {"thread_id": thread_id}}
         
         # Recuperar historial existente

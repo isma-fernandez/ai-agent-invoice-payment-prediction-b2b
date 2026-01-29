@@ -5,6 +5,8 @@ import pandas as pd
 
 
 class DataRetriever:
+    """Recupera datos de facturas y clientes desde Odoo."""
+
     def __init__(self, odoo_connection: OdooConnection, cutoff_date: str = None):
         self.odoo_connection = odoo_connection
         self.cutoff_date = cutoff_date
@@ -58,6 +60,7 @@ class DataRetriever:
 
     async def _fetch_with_optional_limit(self, model: str, domain: list,
                                          fields: list, limit: int = None) -> list:
+        """Recupera registros con limite opcional."""
         if limit is None or limit == 0:
             return await self._fetch_all_parallel(model, domain, fields)
         else:

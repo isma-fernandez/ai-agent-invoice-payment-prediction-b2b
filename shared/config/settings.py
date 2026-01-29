@@ -1,7 +1,9 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-class Settings(BaseSettings): 
+class Settings(BaseSettings):
+    """Configuración global de la aplicación cargada desde variables de entorno."""
+
     # Configuración Odoo (opcional para agentes que no lo necesitan)
     ODOO_URL: str | None = None
     ODOO_DB: str | None = None
