@@ -1,7 +1,7 @@
 import plotly.graph_objects as go
 import plotly.express as px
 import uuid
-from typing import Dict
+from typing import Dict, Optional
 from shared.models.domain import ChartType
 
 class ChartGenerator:
@@ -148,7 +148,7 @@ class ChartGenerator:
         return fig
 
 
-    def get_chart(self, chart_id: str) -> go.Figure | None:
+    def get_chart(self, chart_id: str) -> Optional[go.Figure]:
         """Recupera un gráfico por su ID."""
         return self.charts.get(chart_id)
 

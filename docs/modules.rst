@@ -1,7 +1,9 @@
-src
-===
+Módulos
+=======
 
 .. toctree::
    :maxdepth: 4
 
-   src
+   apps
+   shared
+   services
