@@ -2,8 +2,6 @@ import pandas as pd
 import numpy as np
 from typing import Any, Dict, Optional, Tuple
 
-# TODO: Añadir ejemplos de uso en docstrings
-
 class FeatureEngineering:
     """Transformación de datos limpios de Odoo en características para el modelo.
 

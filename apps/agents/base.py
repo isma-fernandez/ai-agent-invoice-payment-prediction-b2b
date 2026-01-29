@@ -53,7 +53,6 @@ class BaseAgent:
         for msg in messages:
             msgs.append(msg)
 
-        # TODO: Revisar esto
         if len(msgs) > 1 and not isinstance(msgs[1], HumanMessage):
             idx = None
             for i, msg in enumerate(msgs[1:], start=1):

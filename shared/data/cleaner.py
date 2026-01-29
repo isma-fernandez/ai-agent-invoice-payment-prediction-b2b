@@ -2,8 +2,6 @@ import pandas as pd
 import numpy as np
 from typing import Tuple
 
-# TODO: Añadir ejemplos de uso en docstrings
-
 RATES = {
     'MXN': 0.048, 
     'USD': 0.92,   
@@ -32,7 +30,6 @@ class DataCleaner:
         # Configuración para limpieza de estados de pago
         self.partial_to_paid_threshold = 0.5
 
-        # TODO: buscar una forma de actualizar estas tasas dinámicamente
         self._currency_rates = RATES
         # Umbral máximo de importe para filtrar facturas erróneas
         self.max_invoice_amount_eur = 1_000_000
