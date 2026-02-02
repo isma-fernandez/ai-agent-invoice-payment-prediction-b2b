@@ -33,9 +33,9 @@ El sistema sigue una arquitectura multiagente donde un **Orquestador** coordina 
 
 
 
-![Diagrama de Arquitectura](https://i.postimg.cc/KzJK1x4h/Mermaid-Chart-Create-complex-visual-diagrams-with-text-2026-01-29-174321.png)
+![Diagrama de Arquitectura](diagrams/arquitectura/aquitectura_expandida.png)
 
-El frontend Streamlit se comunica con el Orquestador via REST API. Este analiza la consulta del usuario, genera un plan de ejecucion y delega tareas a los sub-agentes segun sea necesario. Los agentes acceden a Odoo para datos, al servicio de prediccion para analisis ML, y al servicio de memoria para notas persistentes.
+El frontend Streamlit se comunica con el Orquestador vía REST API. Este analiza la consulta del usuario, genera un plan de ejecución y delega tareas a los sub-agentes según sea necesario. Los agentes acceden a Odoo para datos, al servicio de predicción para análisis ML, y al servicio de memoria para notas persistentes.
 
 ### Módulos
 
@@ -45,7 +45,15 @@ El frontend Streamlit se comunica con el Orquestador via REST API. Este analiza 
 | `apps/agents/` | Sub-agentes especializados (data, analysis, memory) |
 | `apps/frontend/` | Interfaz Streamlit para interacción con usuarios |
 | `shared/` | Código compartido: clientes, modelos, utilidades |
-| `services/` | Servidores MCP para prediccion y memoria |
+| `services/` | Servidores MCP para predicción y memoria |
+
+---
+
+## Cómo funciona
+
+El siguiente diagrama muestra el flujo completo cuando un usuario realiza una consulta:
+
+![Flujo principal de consulta](diagrams/flujos/ejemplo_flujo_consulta_usuario.png)
 
 ---
 
@@ -60,7 +68,7 @@ El frontend Streamlit se comunica con el Orquestador via REST API. Este analiza 
 
 ---
 
-## Instalacion
+## Instalación
 
 ### 1. Clonar el repositorio
 
@@ -119,6 +127,8 @@ Esto levanta:
 - Memory Agent (puerto 8003)
 - Orchestrator (puerto 8004)
 
+![Dependencias Docker](diagrams/arquitectura/dependencias_docker.png)
+
 ### 2. Ejecutar el frontend
 
 ```bash
@@ -127,12 +137,12 @@ uv run streamlit run apps/frontend/chat.py
 
 ### 3. Ejemplos de consultas
 
-- "Dame informacion sobre el cliente Acme Corp"
-- "Cuales son las facturas vencidas de Elogia?"
+- "Dame información sobre el cliente Acme Corp"
+- "Cuáles son las facturas vencidas de Elogia?"
 - "Predice el riesgo de la factura INV-2024-001"
 - "Genera un aging report global"
-- "Compara los clientes con ID 10 y 15"
-- "Recuerda que Acme tiene problemas de tesoreria"
+- "Compara los clientes Elogia y SEAT"
+- "Recuerda que Acme tiene problemas de tesorería"
 
 ---
 
@@ -146,11 +156,8 @@ ai-agent-invoice-payment-prediction-b2b/
 │   │   ├── analysis_agent/     # Análisis y predicciones
 │   │   └── memory_agent/       # Gestión de notas/alertas
 │   ├── orchestrator/           # Orquestador principal
-│   │   ├── graph.py            # Grafo LangGraph
-│   │   ├── prompts.py          # Prompts del router
-│   │   └── main.py             # Servidor FastAPI
-│   └── frontend/
-│       └── chat.py             # Interfaz Streamlit
+│   └── frontend/               # Interfaz Streamlit
+├── diagrams/                   # Diagramas del proyecto
 ├── shared/
 │   ├── clients/                # Clientes A2A y MCP
 │   ├── config/                 # Configuración (Pydantic Settings)
@@ -167,7 +174,7 @@ ai-agent-invoice-payment-prediction-b2b/
 ├── models/
 │   └── late_invoice_payment_classification.pkl
 ├── docs/                       # Documentación Sphinx
-├── notebooks/                  # Notebooks de exploracion
+├── notebooks/                  # Notebooks de exploración
 ├── docker-compose.yml
 ├── requirements.txt
 └── README.md
@@ -210,7 +217,7 @@ Los servicios se comunican internamente usando nombres de contenedor:
 
 ## Documentación
 
-### Generar documentacion con Sphinx
+### Generar documentación con Sphinx
 
 ```bash
 cd docs
@@ -228,6 +235,17 @@ uv run make html         # Linux/Mac
 start _build/html/index.html   # Windows
 open _build/html/index.html    # Mac
 ```
+
+### Diagramas
+
+La carpeta de diagramas (`diagrams/`) contiene diagramas adicionales del proyecto organizados por categoría:
+
+| Carpeta | Contenido |
+|---------|-----------|
+| `arquitectura/` | Vistas de arquitectura y despliegue |
+| `flujos/` | Diagramas de secuencia y flujos de datos |
+| `componentes/` | Detalles de componentes (ML, datos, etc.) |
+| `estados/` | Diagramas de estados de los agentes |
 
 ---
 
