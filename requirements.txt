@@ -1,42 +1,23 @@
-# ============================================
-# Dependencias directas del proyecto
-# ============================================
-
-# --- Agentes y Orquestador ---
-a2a-sdk>=0.3.0                  # Protocolo A2A
-langchain-core>=1.0.0           # LangChain base
-langchain-mistralai>=1.0.0      # LLM Mistral
-langgraph>=1.0.0                # Framework multiagente
-langgraph-checkpoint>=3.0.0     # Persistencia de estado
-langsmith>=0.5.0                # Tracing
-fastapi>=0.100.0                # API REST
-uvicorn>=0.30.0                 # Servidor ASGI
-httpx>=0.28.0                   # Cliente HTTP async
-tenacity>=9.0.0                 # Retry con backoff
-pydantic>=2.0.0                 # Validación de datos
-pydantic-settings>=2.0.0        # Configuración desde .env
-
-# --- Datos ---
-pandas>=2.0.0                   # Manipulación de datos
-numpy>=2.0.0                    # Cálculos numéricos
-odoorpc>=0.10.0                 # Conexión a Odoo
-
-# --- MCP Clients ---
-fastmcp>=2.0.0                  # Cliente MCP
-
-# --- Visualización ---
-plotly>=6.0.0                   # Gráficos interactivos
-
-# --- Frontend ---
-streamlit>=1.50.0               # UI de chat
-
-# --- ML (para notebooks) ---
-scikit-learn>=1.8.0             # Modelos ML
-joblib>=1.5.0                   # Serialización de modelos
-
-# --- Base de datos ---
-psycopg2-binary                 # PostgreSQL
-
-# --- Documentación ---
-sphinx>=9.0.0                   # Generador de docs
-furo>=2025.0.0                  # Tema Sphinx
+a2a-sdk>=0.3.0                
+langchain-core>=1.0.0         
+langchain-mistralai>=1.0.0    
+langgraph>=1.0.0               
+langgraph-checkpoint>=3.0.0     
+langsmith>=0.5.0               
+fastapi>=0.100.0             
+uvicorn>=0.30.0               
+httpx>=0.28.0                   
+tenacity>=9.0.0                 
+pydantic>=2.0.0               
+pydantic-settings>=2.0.0       
+pandas>=2.0.0                
+numpy>=2.0.0            
+odoorpc>=0.10.0              
+fastmcp>=2.0.0             
+plotly>=6.0.0              
+streamlit>=1.50.0          
+scikit-learn>=1.8.0        
+joblib>=1.5.0                 
+psycopg2-binary               
+sphinx>=9.0.0                
+furo>=2025.0.0              
