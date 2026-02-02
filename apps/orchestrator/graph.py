@@ -137,7 +137,6 @@ class Orchestrator:
             HumanMessage(content=prompt)
         ])
 
-        #formato [{"agent": "...", "task": "..."}]
         try:
             content = response.content.strip()
             content = re.sub(r'^```json\s*', '', content)
@@ -317,7 +316,7 @@ class Orchestrator:
                     break
             cleaned_collected.append(temp.strip())
 
-        # Prompt SIN gráfico
+        # Prompt sin gráfico
         system_instruction = (
             "Eres un asistente financiero profesional. "
             "Responde en español, sin emojis, de forma directa. "
@@ -486,10 +485,8 @@ class Orchestrator:
                 full_response += event["content"]
                 yield event
             elif event["type"] == "charts":
-                # gráficos al final
                 full_response += "\n\n" + event["content"]
         
-        # Checkpointer
         state["messages"] = state["messages"] + [AIMessage(content=full_response)]
         self.graph.update_state(config, state)
         yield {"type": "complete", "response": full_response}

@@ -1,4 +1,3 @@
-"""Gestión de recursos compartidos entre sub-agentes."""
 from shared.data.manager import DataManager
 
 _data_manager: DataManager = None
