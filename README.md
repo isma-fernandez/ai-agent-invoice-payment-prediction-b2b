@@ -171,8 +171,7 @@ ai-agent-invoice-payment-prediction-b2b/
 │   ├── agents/                 # Dockerfile para agentes
 │   ├── prediction_mcp/         # Dockerfile para predicción MCP
 │   └── memory_mcp/             # Dockerfile para memoria MCP
-├── models/
-│   └── late_invoice_payment_classification.pkl
+├── models/                     # Modelo de predicción
 ├── docs/                       # Documentación Sphinx
 ├── notebooks/                  # Notebooks de exploración
 ├── docker-compose.yml
