@@ -1,4 +1,4 @@
-# B2B Invoice Payment Prediction Agent
+# Agente IA para la predicción de pagos B2B
 
 Sistema multiagente para predicción de pagos de facturas B2B, integrando datos de Odoo con modelos de machine learning.
 
