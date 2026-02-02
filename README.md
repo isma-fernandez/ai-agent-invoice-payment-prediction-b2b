@@ -33,7 +33,7 @@ El sistema sigue una arquitectura multiagente donde un **Orquestador** coordina 
 
 
 
-![Diagrama de Arquitectura](diagrams/arquitectura/aquitectura.png)
+![Diagrama de Arquitectura](diagrams/arquitectura/arquitectura.png)
 
 El frontend Streamlit se comunica con el Orquestador vía REST API. Este analiza la consulta del usuario, genera un plan de ejecución y delega tareas a los sub-agentes según sea necesario. Los agentes acceden a Odoo para datos, al servicio de predicción para análisis ML, y al servicio de memoria para notas persistentes.
 
