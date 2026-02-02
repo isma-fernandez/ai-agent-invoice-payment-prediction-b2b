@@ -8,19 +8,19 @@ Sistema multiagente para predicción de pagos de facturas B2B, integrando datos 
 
 ---
 
-## Descripcion
+## Descripción
 
 Este proyecto implementa un asistente financiero inteligente que ayuda a gestionar cobros en entornos B2B. Utiliza una arquitectura multiagente basada en LangGraph para:
 
-- Consultar informacion de clientes y facturas desde Odoo
+- Consultar información de clientes y facturas desde Odoo
 - Predecir el riesgo de impago de facturas usando modelos ML
 - Analizar tendencias de pago y generar reportes (aging, portfolio)
 - Mantener notas y alertas sobre clientes
 
-**Tecnologias principales:**
-- LangGraph + Mistral AI (orquestacion de agentes)
+**Tecnologías principales:**
+- LangGraph + Mistral AI (orquestación de agentes)
 - FastAPI (API REST)
-- A2A Protocol (comunicacion entre agentes)
+- A2A Protocol (comunicación entre agentes)
 - MCP (Model Context Protocol para servicios ML)
 - Streamlit (interfaz de usuario)
 - Docker Compose (despliegue)
@@ -29,7 +29,7 @@ Este proyecto implementa un asistente financiero inteligente que ayuda a gestion
 
 ## Arquitectura
 
-El sistema sigue una arquitectura multiagente donde un **Orquestador** coordina la ejecucion de agentes especializados. La comunicacion entre agentes utiliza el protocolo **A2A (Agent-to-Agent)**, mientras que los servicios de ML y persistencia de datos se exponen mediante **MCP (Model Context Protocol)**.
+El sistema sigue una arquitectura multiagente donde un **Orquestador** coordina la ejecución de agentes especializados. La comunicación entre agentes utiliza el protocolo **A2A (Agent-to-Agent)**, mientras que los servicios de ML y persistencia de datos se exponen mediante **MCP (Model Context Protocol)**.
 
 
 
@@ -37,14 +37,14 @@ El sistema sigue una arquitectura multiagente donde un **Orquestador** coordina 
 
 El frontend Streamlit se comunica con el Orquestador via REST API. Este analiza la consulta del usuario, genera un plan de ejecucion y delega tareas a los sub-agentes segun sea necesario. Los agentes acceden a Odoo para datos, al servicio de prediccion para analisis ML, y al servicio de memoria para notas persistentes.
 
-### Modulos
+### Módulos
 
-| Modulo | Descripcion |
+| Módulo | Descripción |
 |--------|-------------|
 | `apps/orchestrator/` | Orquestador principal que planifica y coordina sub-agentes |
 | `apps/agents/` | Sub-agentes especializados (data, analysis, memory) |
-| `apps/frontend/` | Interfaz Streamlit para interaccion con usuarios |
-| `shared/` | Codigo compartido: clientes, modelos, utilidades |
+| `apps/frontend/` | Interfaz Streamlit para interacción con usuarios |
+| `shared/` | Código compartido: clientes, modelos, utilidades |
 | `services/` | Servidores MCP para prediccion y memoria |
 
 ---
@@ -71,7 +71,7 @@ cd ai-agent-invoice-payment-prediction-b2b
 
 ### 2. Configurar variables de entorno
 
-Crear archivo `.env` en la raiz del proyecto:
+Crear archivo `.env` en la raíz del proyecto:
 
 ```env
 # Odoo
@@ -143,8 +143,8 @@ ai-agent-invoice-payment-prediction-b2b/
 ├── apps/
 │   ├── agents/                 # Sub-agentes
 │   │   ├── data_agent/         # Consulta datos de Odoo
-│   │   ├── analysis_agent/     # Analisis y predicciones
-│   │   └── memory_agent/       # Gestion de notas/alertas
+│   │   ├── analysis_agent/     # Análisis y predicciones
+│   │   └── memory_agent/       # Gestión de notas/alertas
 │   ├── orchestrator/           # Orquestador principal
 │   │   ├── graph.py            # Grafo LangGraph
 │   │   ├── prompts.py          # Prompts del router
@@ -153,20 +153,20 @@ ai-agent-invoice-payment-prediction-b2b/
 │       └── chat.py             # Interfaz Streamlit
 ├── shared/
 │   ├── clients/                # Clientes A2A y MCP
-│   ├── config/                 # Configuracion (Pydantic Settings)
+│   ├── config/                 # Configuración (Pydantic Settings)
 │   ├── data/                   # DataManager, Cleaner, Retriever
 │   ├── models/                 # Modelos de dominio (Pydantic)
 │   └── utils/                  # Utilidades (chart_generator)
 ├── services/
-│   ├── prediction_mcp/         # Servidor MCP de prediccion
+│   ├── prediction_mcp/         # Servidor MCP de predicción
 │   └── memory_mcp/             # Servidor MCP de memoria
 ├── docker/
 │   ├── agents/                 # Dockerfile para agentes
-│   ├── prediction_mcp/         # Dockerfile para prediccion MCP
+│   ├── prediction_mcp/         # Dockerfile para predicción MCP
 │   └── memory_mcp/             # Dockerfile para memoria MCP
 ├── models/
 │   └── late_invoice_payment_classification.pkl
-├── docs/                       # Documentacion Sphinx
+├── docs/                       # Documentación Sphinx
 ├── notebooks/                  # Notebooks de exploracion
 ├── docker-compose.yml
 ├── requirements.txt
@@ -175,11 +175,11 @@ ai-agent-invoice-payment-prediction-b2b/
 
 ---
 
-## Configuracion
+## Configuración
 
 ### Variables de Entorno
 
-| Variable | Descripcion | Requerido |
+| Variable | Descripción | Requerido |
 |----------|-------------|-----------|
 | `ODOO_URL` | URL de la instancia Odoo | Si |
 | `ODOO_DB` | Nombre de la base de datos | Si |
@@ -208,14 +208,14 @@ Los servicios se comunican internamente usando nombres de contenedor:
 
 ---
 
-## Documentacion
+## Documentación
 
 ### Generar documentacion con Sphinx
 
 ```bash
 cd docs
 
-# Generar archivos .rst desde el codigo
+# Generar archivos .rst desde el código
 uv run sphinx-apidoc -f -o . ../apps -e --implicit-namespaces
 uv run sphinx-apidoc -f -o . ../shared -e --implicit-namespaces
 uv run sphinx-apidoc -f -o . ../services -e --implicit-namespaces
@@ -224,7 +224,7 @@ uv run sphinx-apidoc -f -o . ../services -e --implicit-namespaces
 uv run ./make.bat html   # Windows
 uv run make html         # Linux/Mac
 
-# Abrir documentacion
+# Abrir documentación
 start _build/html/index.html   # Windows
 open _build/html/index.html    # Mac
 ```
@@ -250,7 +250,7 @@ open _build/html/index.html    # Mac
 # Ver logs de todos los servicios
 docker-compose logs -f
 
-# Ver logs de un servicio especifico
+# Ver logs de un servicio específico
 docker-compose logs -f orchestrator
 ```
 
@@ -258,7 +258,7 @@ docker-compose logs -f orchestrator
 
 ## Licencia
 
-Este proyecto es parte de un Trabajo de Fin de Grado (TFG) de la Escuela de Ingenieria de la Universidad Autónoma de Barcelona.
+Este proyecto es parte de un Trabajo de Fin de Grado (TFG) de la Escuela de Ingeniería de la Universidad Autónoma de Barcelona.
 
 ## Autor
 
