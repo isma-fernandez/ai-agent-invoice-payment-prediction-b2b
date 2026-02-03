@@ -275,7 +275,7 @@ docker-compose logs -f orchestrator
 
 ## Licencia
 
-Este proyecto es parte de un Trabajo de Fin de Grado (TFG) de la Escuela de Ingeniería de la Universidad Autónoma de Barcelona.
+Este proyecto es parte de un Trabajo de Fin de Grado (TFG) de Ingeniería Informática de la Universidad Autónoma de Barcelona.
 
 ## Autor
 
