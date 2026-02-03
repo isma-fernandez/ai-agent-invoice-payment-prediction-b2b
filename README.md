@@ -73,7 +73,7 @@ El siguiente diagrama muestra el flujo completo cuando un usuario realiza una co
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/ai-agent-invoice-payment-prediction-b2b.git
+git clone https://github.com/isma-fernandez/ai-agent-invoice-payment-prediction-b2b.git
 cd ai-agent-invoice-payment-prediction-b2b
 ```
 
